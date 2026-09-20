@@ -1,0 +1,100 @@
+[
+  {
+    "id": "H001",
+    "name": "Demo General Hospital",
+    "type": "hospital",
+    "latitude": 11.0180,
+    "longitude": 76.9565
+  },
+  {
+    "id": "H002",
+    "name": "City Care Hospital",
+    "type": "hospital",
+    "latitude": 11.0250,
+    "longitude": 76.9620
+  },
+  {
+    "id": "H003",
+    "name": "Central Medical Center",
+    "type": "hospital",
+    "latitude": 11.0050,
+    "longitude": 76.9480
+  },
+  {
+    "id": "H004",
+    "name": "Community Hospital",
+    "type": "hospital",
+    "latitude": 11.0350,
+    "longitude": 76.9700
+  },
+  {
+    "id": "H005",
+    "name": "North Care Hospital",
+    "type": "hospital",
+    "latitude": 11.0450,
+    "longitude": 76.9400
+  },
+  {
+    "id": "S001",
+    "name": "Demo Government School",
+    "type": "school",
+    "latitude": 11.0200,
+    "longitude": 76.9580
+  },
+  {
+    "id": "S002",
+    "name": "Central Higher Secondary School",
+    "type": "school",
+    "latitude": 11.0300,
+    "longitude": 76.9500
+  },
+  {
+    "id": "S003",
+    "name": "North Public School",
+    "type": "school",
+    "latitude": 11.0500,
+    "longitude": 76.9650
+  },
+  {
+    "id": "F001",
+    "name": "Central Fire Station",
+    "type": "fire_station",
+    "latitude": 11.0120,
+    "longitude": 76.9600
+  },
+  {
+    "id": "F002",
+    "name": "North Fire Station",
+    "type": "fire_station",
+    "latitude": 11.0400,
+    "longitude": 76.9750
+  },
+  {
+    "id": "P001",
+    "name": "Central Police Station",
+    "type": "police_station",
+    "latitude": 11.0140,
+    "longitude": 76.9520
+  },
+  {
+    "id": "P002",
+    "name": "North Police Station",
+    "type": "police_station",
+    "latitude": 11.0450,
+    "longitude": 76.9700
+  },
+  {
+    "id": "B001",
+    "name": "Central Bus Terminal",
+    "type": "bus_terminal",
+    "latitude": 11.0100,
+    "longitude": 76.9500
+  },
+  {
+    "id": "B002",
+    "name": "North Bus Terminal",
+    "type": "bus_terminal",
+    "latitude": 11.0500,
+    "longitude": 76.9550
+  }
+]

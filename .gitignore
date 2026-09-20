@@ -1,0 +1,40 @@
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
+# Python environments
+.venv/
+venv/
+backend/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded/local files
+backend/uploads/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# IDE settings
+.vscode/
+.idea/
+
+# Backups and archives
+*.backup
+*.zip
+
+# Environment/secrets
+.env
+.env.*
+!.env.example

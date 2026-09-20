@@ -1,0 +1,5 @@
+export const demoIncidents = {
+  'INC-001': { id:'INC-001', title:'Road waterlogging', type:'Waterlogging', description:'The road near the hospital is flooded and ambulances are having difficulty getting through.', location:'Hospital Access Road · Coimbatore', latitude:11.0168, longitude:76.9558, score:91, level:'CRITICAL', department:'Drainage', team:'Team B', reports:3, facility:'Hospital · 182m', confidence:92, status:'AWAITING_APPROVAL' },
+  'INC-002': { id:'INC-002', title:'Road damage near school', type:'Road damage', description:'Large damaged section reported near the school junction.', location:'Main Junction · Coimbatore', latitude:11.0205, longitude:76.962, score:67, level:'HIGH', department:'Roads', team:'Team A', reports:2, facility:'School · 260m', confidence:87, status:'VERIFIED' },
+  'INC-003': { id:'INC-003', title:'Broken streetlight', type:'Streetlight', description:'Streetlight is not functioning on a residential road.', location:'Residential Road · Coimbatore', latitude:11.013, longitude:76.95, score:34, level:'MEDIUM', department:'Electrical', team:'Team C', reports:1, facility:'Residential area', confidence:94, status:'NEW' }
+}
