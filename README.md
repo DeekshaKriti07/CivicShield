@@ -42,6 +42,16 @@ Mutating API requests require `X-CSRF-Protection: 1`; supplied browser origins m
 
 The application checks role and report ownership on the server. Public registration never creates operators. Set `REGISTRATION_ENABLED=false` if accounts are provisioned by an administrator only. There are no shared demo accounts or default passwords.
 
+## Vercel deployment
+
+Use the **repository root**, rather than `frontend`, as the Vercel project's Root Directory. Select the FastAPI framework preset and remove any previous Vite Output Directory override. `vercel.json` builds React, and the `backend.main:app` entrypoint serves the UI, icons, and `/api` routes on one domain. Python 3.12 is pinned in `.python-version`; root `requirements.txt` is the canonical runtime dependency list.
+
+Before deploying, configure `DATABASE_URL` with a durable PostgreSQL database, `ENVIRONMENT=production`, `COOKIE_SECURE=true`, and `AI_ENABLED=false`. Keep credentials in Vercel's environment settings. Do not use SQLite or a development environment as a deployment workaround. Set these variables separately for any preview environment you intend to use; keep preview and production data separate.
+
+The build uses `npm --prefix frontend ci && npm --prefix frontend run build`. Do not set the Output Directory to `frontend/dist`: this project deploys the Python application as well as static files. Existing public URLs can be retained by redeploying the existing project after updating its settings.
+
+Provision an operator using `python -m backend.manage your-operator-name` from a trusted environment connected to the production database. Public registration creates reporters only. Creating a database or deploying the app does not create a default administrator or shared password.
+
 ## Render deployment
 
 The existing Python web service name is retained in `render.yaml`. Its build now includes the React frontend, and FastAPI serves the compiled assets. This removes the localhost API and cross-origin cookie configuration errors.
