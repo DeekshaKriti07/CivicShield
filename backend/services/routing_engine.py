@@ -2,16 +2,13 @@ from typing import Any
 
 
 class RoutingEngine:
-
     def route(
-            self,
-            incident_type: str | None,
-            risk_level: str | None,
+        self,
+        incident_type: str | None,
+        risk_level: str | None,
     ) -> dict[str, Any]:
 
-        incident_type = (
-                incident_type or "OTHER"
-        ).upper()
+        incident_type = (incident_type or "OTHER").upper()
 
         routes = {
             "FLOOD": {
@@ -49,9 +46,7 @@ class RoutingEngine:
             routes["OTHER"],
         )
 
-        priority = (
-                risk_level or "MEDIUM"
-        ).upper()
+        priority = (risk_level or "MEDIUM").upper()
 
         return {
             "department": selected["department"],
@@ -59,7 +54,6 @@ class RoutingEngine:
             "priority": priority,
             "incident_type": incident_type,
             "routing_reason": (
-                f"{incident_type} incident "
-                f"requires {selected['department']}."
+                f"{incident_type} incident requires {selected['department']}."
             ),
         }

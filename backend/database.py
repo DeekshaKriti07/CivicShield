@@ -3,26 +3,17 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from backend.config import settings
 
-
-connect_args = {}
-
-if settings.database_url.startswith("sqlite"):
-    connect_args = {
-        "check_same_thread": False,
-    }
-
-
+url = settings.database_url
+if url.startswith("postgres://"):
+    url = url.replace("postgres://", "postgresql+psycopg://", 1)
+elif url.startswith("postgresql://"):
+    url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 engine = create_engine(
-    settings.database_url,
-    connect_args=connect_args,
+    url,
+    pool_pre_ping=True,
+    connect_args={"check_same_thread": False} if url.startswith("sqlite") else {},
 )
-
-
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-)
+SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
 
 class Base(DeclarativeBase):
@@ -30,18 +21,11 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    db = SessionLocal()
-
-    try:
+    with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 
 def init_db():
-    from backend import models
-    from backend import auth_models
+    from backend import auth_models, models  # noqa: F401
 
-    Base.metadata.create_all(
-        bind=engine
-    )
+    Base.metadata.create_all(bind=engine)

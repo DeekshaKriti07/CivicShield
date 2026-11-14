@@ -1,7 +1,5 @@
 import json
 import math
-from pathlib import Path
-
 
 FACILITY_RADIUS_METERS = 500
 CRITICAL_RADIUS_METERS = 200
@@ -9,23 +7,24 @@ CRITICAL_RADIUS_METERS = 200
 
 class FacilityService:
     def __init__(self):
-        data_path = (
-                Path(__file__).resolve().parents[1]
-                / "data"
-                / "facilities.json"
-        )
+        from backend.config import settings
 
-        with open(
-                data_path,
-                "r",
-                encoding="utf-8",
-        ) as file:
-            self.facilities = json.load(file)
+        self.facilities = []
+        if settings.facilities_file:
+            with open(settings.facilities_file, encoding="utf-8") as file:
+                self.facilities = json.load(file)
+            for facility in self.facilities:
+                if (
+                    not isinstance(facility.get("name"), str)
+                    or not -90 <= facility["latitude"] <= 90
+                    or not -180 <= facility["longitude"] <= 180
+                ):
+                    raise ValueError("Invalid configured facility record")
 
     def find_nearby_facilities(
-            self,
-            latitude: float,
-            longitude: float,
+        self,
+        latitude: float,
+        longitude: float,
     ) -> list[dict]:
 
         nearby = []
@@ -46,27 +45,20 @@ class FacilityService:
                             distance,
                             2,
                         ),
-                        "critical": (
-                                distance
-                                <= CRITICAL_RADIUS_METERS
-                        ),
+                        "critical": (distance <= CRITICAL_RADIUS_METERS),
                     }
                 )
 
-        nearby.sort(
-            key=lambda facility: facility[
-                "distance_meters"
-            ]
-        )
+        nearby.sort(key=lambda facility: facility["distance_meters"])
 
         return nearby
 
     @staticmethod
     def calculate_distance(
-            latitude1: float,
-            longitude1: float,
-            latitude2: float,
-            longitude2: float,
+        latitude1: float,
+        longitude1: float,
+        latitude2: float,
+        longitude2: float,
     ) -> float:
 
         earth_radius = 6_371_000
@@ -74,19 +66,13 @@ class FacilityService:
         lat1 = math.radians(latitude1)
         lat2 = math.radians(latitude2)
 
-        delta_lat = math.radians(
-            latitude2 - latitude1
-        )
+        delta_lat = math.radians(latitude2 - latitude1)
 
-        delta_lon = math.radians(
-            longitude2 - longitude1
-        )
+        delta_lon = math.radians(longitude2 - longitude1)
 
         a = (
-                math.sin(delta_lat / 2) ** 2
-                + math.cos(lat1)
-                * math.cos(lat2)
-                * math.sin(delta_lon / 2) ** 2
+            math.sin(delta_lat / 2) ** 2
+            + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
         )
 
         c = 2 * math.atan2(

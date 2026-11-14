@@ -1,58 +1,36 @@
-import { getUser, logout } from '../auth/auth'
-
-export default function ProfilePage({ onBack, onLogout }) {
-  const user = getUser()
-
-  function handleLogout() {
-    logout()
-    onLogout()
-  }
-
+export default function ProfilePage({ user }) {
   return (
-    <main className="profile-page">
-      <section className="profile-card">
-        <button className="profile-back" onClick={onBack}>
-          ← Back
-        </button>
-
-        <div className="profile-avatar">
-          {(user?.username || 'OP').slice(0, 2).toUpperCase()}
-        </div>
-
-        <p className="profile-label">OPERATOR PROFILE</p>
-
-        <h1>{user?.username || 'Operator'}</h1>
-
-        <p className="profile-role">
-          {user?.role || 'OPERATOR'}
+    <>
+      <a className="back-link" href="#incidents">
+        ← Reports
+      </a>
+      <div className="page-heading">
+        <h1>Your account</h1>
+      </div>
+      <section className="panel padded account-panel">
+        <dl>
+          <div>
+            <dt>Username</dt>
+            <dd>{user.username}</dd>
+          </div>
+          <div>
+            <dt>Role</dt>
+            <dd>{user.role}</dd>
+          </div>
+          <div>
+            <dt>Access</dt>
+            <dd>
+              {user.role === 'REPORTER'
+                ? 'Submit and view your own reports'
+                : 'Review reports and record decisions'}
+            </dd>
+          </div>
+        </dl>
+        <p className="muted">
+          Operator access is managed by the administrator. Sign out when using a
+          shared computer.
         </p>
-
-        <div className="profile-details">
-          <div>
-            <span>USERNAME</span>
-            <strong>{user?.username || '—'}</strong>
-          </div>
-
-          <div>
-            <span>ROLE</span>
-            <strong>{user?.role || '—'}</strong>
-          </div>
-
-          <div>
-            <span>SESSION</span>
-            <strong>AUTHENTICATED</strong>
-          </div>
-
-          <div>
-            <span>ACCESS</span>
-            <strong>CIVIC OPERATIONS</strong>
-          </div>
-        </div>
-
-        <button className="profile-logout" onClick={handleLogout}>
-          SIGN OUT
-        </button>
       </section>
-    </main>
+    </>
   )
 }

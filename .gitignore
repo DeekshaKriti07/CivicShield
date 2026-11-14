@@ -38,3 +38,9 @@ backend/uploads/
 .env
 .env.*
 !.env.example
+
+
+# Browser test output
+frontend/test-results/
+frontend/playwright-report/
+.test-data/

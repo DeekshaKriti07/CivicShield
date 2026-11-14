@@ -1,3 +1,61 @@
-import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, AlertTriangle, BrainCircuit, Truck, Activity } from 'lucide-react'
-import ThemeToggle from './ThemeToggle'
-export default function AgentTrace({onBack}){const events=[['09:42:11','TRIAGE AGENT','Waterlogging detected','92% confidence',CheckCircle2,'done'],['09:42:14','VERIFICATION AGENT','Evidence verified','3 reports fused · no duplicate escalation',CheckCircle2,'done'],['09:42:17','RISK ENGINE','Critical risk identified','Hospital nearby + road blocked + multiple reports',AlertTriangle,'warn'],['09:42:20','ROUTING AGENT','Drainage Team B selected','Controlled civic operations knowledge base',CheckCircle2,'done'],['09:42:23','HUMAN APPROVAL','Response approved','Human checkpoint passed',ShieldCheck,'done'],['09:42:28','ACTION EXECUTOR','Response team dispatched','Simulated dispatch · Team B',Truck,'done'],['09:43:02','MONITORING','Resolution confirmed','Water level 42 cm → 11 cm',Activity,'done']];return <div className="app-shell"><header className="console-topbar"><div className="brand"><button className="icon-button" onClick={onBack}><ArrowLeft size={16}/></button><div className="brand-mark"><ShieldCheck size={18}/></div><div><strong>CivicShield</strong><span>AGENT TRACE</span></div></div><div className="top-actions"><ThemeToggle/><span className="online"><i/> WORKFLOW TRACE</span></div></header><main className="trace-main"><div className="detail-head"><div><span className="section-label">CIVICSHIELD / AGENT TRACE</span><h1>Incident decision timeline</h1><p><span className="mono">INC-001</span> · Road waterlogging · Hospital Access Road</p></div><span className="trace-status"><span/> RESOLUTION COMPLETE</span></div><div className="trace-layout"><section className="panel timeline-panel"><div className="panel-title"><div><span className="section-label">SEQUENTIAL WORKFLOW</span><h2>From signal to resolution</h2></div><BrainCircuit size={18}/></div><div className="timeline">{events.map(([time,agent,title,desc,I,status])=><div className="timeline-item" key={time+agent}><div className="time">{time}</div><div className={`timeline-icon ${status}`}><I size={15}/></div><div className="timeline-copy"><span>{agent}</span><strong>{title}</strong><p>{desc}</p></div></div>)}</div></section><aside className="trace-side"><div className="panel trace-result"><span className="section-label">FINAL STATE</span><div className="result-icon"><CheckCircle2 size={25}/></div><h2>Incident resolved</h2><p>Human-approved response completed successfully.</p><div><span>RISK</span><strong>91 → 18</strong></div><div><span>WATER LEVEL</span><strong>42 → 11 cm</strong></div><div><span>WORKFLOW EVENTS</span><strong>07</strong></div></div><div className="panel accountability"><ShieldCheck size={20}/><span className="section-label">ACCOUNTABILITY</span><h3>AI recommended. A human approved.</h3><p>CivicShield keeps the reasoning chain visible so every consequential action can be reviewed.</p></div></aside></div></main></div>}
+import { useEffect, useState } from 'react'
+import { api } from '../services/api'
+import { date } from './RecordParts'
+export default function AgentTrace({ incidentId }) {
+  const [events, setEvents] = useState(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    api
+      .timeline(incidentId)
+      .then((data) => {
+        if (active) setEvents(data.events)
+      })
+      .catch((err) => {
+        if (active) setError(err.message)
+      })
+    return () => {
+      active = false
+    }
+  }, [incidentId])
+  return (
+    <>
+      <a className="back-link" href={`#incident/${incidentId}`}>
+        ← Report #{incidentId}
+      </a>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Saved events</p>
+          <h1>Record history</h1>
+          <p className="muted">
+            Actions recorded for report #{incidentId}, in order.
+          </p>
+        </div>
+      </div>
+      <section className="panel padded">
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : events === null ? (
+          <p role="status">Loading history…</p>
+        ) : events.length === 0 ? (
+          <p>No events recorded.</p>
+        ) : (
+          <ol className="history-list">
+            {events.map((event) => (
+              <li key={event.id}>
+                <time>{date(event.timestamp)}</time>
+                <div>
+                  <h2>{event.event_type.replaceAll('_', ' ')}</h2>
+                  <p>{event.summary}</p>
+                  <small className="muted">Recorded by {event.agent}</small>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </>
+  )
+}

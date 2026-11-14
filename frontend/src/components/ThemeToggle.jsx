@@ -1,3 +1,20 @@
-import { Moon, Sun } from 'lucide-react'
 import { useState } from 'react'
-export default function ThemeToggle(){const [dark,setDark]=useState(!document.documentElement.classList.contains('light'));const toggle=()=>{const next=!dark;setDark(next);document.documentElement.classList.toggle('dark',next);document.documentElement.classList.toggle('light',!next);localStorage.setItem('civicshield-theme',next?'dark':'light')};return <button className="theme-toggle" onClick={toggle} aria-label="Toggle theme"><span className={dark?'theme-active':''}><Moon size={13}/> DARK</span><span className={!dark?'theme-active':''}><Sun size={13}/> LIGHT</span></button>}
+export default function ThemeToggle() {
+  const [dark, setDark] = useState(
+    localStorage.getItem('civicshield-theme') === 'dark',
+  )
+  function toggle() {
+    document.documentElement.classList.toggle('dark', !dark)
+    localStorage.setItem('civicshield-theme', !dark ? 'dark' : 'light')
+    setDark(!dark)
+  }
+  return (
+    <button
+      className="text-button"
+      onClick={toggle}
+      aria-label={dark ? 'Use light theme' : 'Use dark theme'}
+    >
+      {dark ? 'Light' : 'Dark'}
+    </button>
+  )
+}

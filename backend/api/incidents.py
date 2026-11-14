@@ -1,688 +1,289 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+"""Authenticated incident records and review workflow; no emergency dispatch adapter."""
+
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.api.auth import get_current_user, require_operator
+from backend.auth_models import User
 from backend.database import get_db
-from backend.api.auth import get_current_user
-from backend.models import AgentEvent, Incident
-from backend.schemas import IncidentCreate, IncidentResponse
+from backend.models import AgentEvent, Incident, IncidentAccess, IncidentAnalysis
+from backend.schemas import IncidentCreate, IncidentResponse, ResolutionRequest
+from backend.security import rate_limit
 from backend.services.ai_classifier import AIClassifier
 from backend.services.ai_planner import AIPlanner
-from backend.services.dispatch_service import DispatchService
-from backend.services.duplicate_detector import DuplicateDetector
 from backend.services.facility_service import FacilityService
 from backend.services.risk_engine import RiskEngine
 from backend.services.routing_engine import RoutingEngine
 
-
-router = APIRouter(tags=["incidents"], dependencies=[Depends(get_current_user)])
-
-ai_classifier = AIClassifier()
-ai_planner = AIPlanner()
-duplicate_detector = DuplicateDetector()
-dispatch_service = DispatchService()
-facility_service = FacilityService()
-risk_engine = RiskEngine()
-routing_engine = RoutingEngine()
+router = APIRouter(tags=["incidents"])
+ai_classifier, ai_planner = AIClassifier(), AIPlanner()
+facility_service, risk_engine, routing_engine = (
+    FacilityService(),
+    RiskEngine(),
+    RoutingEngine(),
+)
 
 
-def log_event(
-        db: Session,
-        incident_id: int,
-        agent_name: str,
-        event_type: str,
-        summary: str,
-):
-    event = AgentEvent(
-        incident_id=incident_id,
-        agent_name=agent_name,
-        event_type=event_type,
-        summary=summary,
-    )
-
-    db.add(event)
+def visible_query(db, user):
+    query = db.query(Incident)
+    if user.role not in {"OPERATOR", "ADMIN"}:
+        query = query.join(
+            IncidentAccess, IncidentAccess.incident_id == Incident.id
+        ).filter(IncidentAccess.user_id == user.id)
+    return query
 
 
-def get_incident_or_404(
-        incident_id: int,
-        db: Session,
-):
-    incident = (
-        db.query(Incident)
-        .filter(Incident.id == incident_id)
-        .first()
-    )
-
+def get_incident_or_404(incident_id, db, user):
+    incident = visible_query(db, user).filter(Incident.id == incident_id).first()
     if incident is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Incident not found",
-        )
-
+        raise HTTPException(404, "Incident not found.")
     return incident
 
 
-@router.post(
-    "/incident",
-    response_model=IncidentResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_incident(
-        payload: IncidentCreate,
-        db: Session = Depends(get_db),
-):
-    incident = Incident(
-        description=payload.description,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
-        status="RECEIVED",
+def log_event(db, incident_id, agent, event, summary):
+    db.add(
+        AgentEvent(
+            incident_id=incident_id, agent_name=agent, event_type=event, summary=summary
+        )
     )
 
+
+def transition(db, incident, expected, status):
+    changed = db.execute(
+        update(Incident)
+        .where(Incident.id == incident.id, Incident.status == expected)
+        .values(status=status),
+        execution_options={"synchronize_session": False},
+    )
+    if changed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "This incident changed. Refresh before trying again.")
+
+
+@router.post("/incident", response_model=IncidentResponse, status_code=201)
+def create_incident(
+    payload: IncidentCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit(db, f"create:{user.id}", 30, 3600)
+    incident = Incident(**payload.model_dump(), status="RECEIVED")
     db.add(incident)
+    db.flush()
+    db.add(IncidentAccess(incident_id=incident.id, user_id=user.id))
+    log_event(db, incident.id, user.username, "INCIDENT_CREATED", "Report recorded.")
     db.commit()
     db.refresh(incident)
-
-    log_event(
-        db,
-        incident.id,
-        "IntakeAgent",
-        "INCIDENT_CREATED",
-        "New civic incident received.",
-    )
-
-    db.commit()
-
     return incident
 
 
-@router.get(
-    "/incident/{incident_id}",
-    response_model=IncidentResponse,
-)
-async def get_incident(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    return get_incident_or_404(
-        incident_id,
-        db,
-    )
-
-
-@router.get(
-    "/incidents",
-    response_model=list[IncidentResponse],
-)
-async def get_incidents(
-        db: Session = Depends(get_db),
+@router.get("/incidents", response_model=list[IncidentResponse])
+def get_incidents(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     return (
-        db.query(Incident)
-        .order_by(Incident.created_at.desc())
+        visible_query(db, user)
+        .order_by(Incident.id.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 
 
-@router.get("/dashboard/summary")
-async def dashboard_summary(
-        db: Session = Depends(get_db),
+@router.get("/incident/{incident_id}", response_model=IncidentResponse)
+def get_incident(
+    incident_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    total = db.query(Incident).count()
-
-    received = (
-        db.query(Incident)
-        .filter(Incident.status == "RECEIVED")
-        .count()
-    )
-
-    analyzed = (
-        db.query(Incident)
-        .filter(Incident.status == "ANALYZED")
-        .count()
-    )
-
-    approved = (
-        db.query(Incident)
-        .filter(Incident.status == "APPROVED")
-        .count()
-    )
-
-    dispatched = (
-        db.query(Incident)
-        .filter(Incident.status == "DISPATCHED")
-        .count()
-    )
-
-    critical = (
-        db.query(Incident)
-        .filter(Incident.risk_level == "CRITICAL")
-        .count()
-    )
-
-    high = (
-        db.query(Incident)
-        .filter(Incident.risk_level == "HIGH")
-        .count()
-    )
-
-    medium = (
-        db.query(Incident)
-        .filter(Incident.risk_level == "MEDIUM")
-        .count()
-    )
-
-    low = (
-        db.query(Incident)
-        .filter(Incident.risk_level == "LOW")
-        .count()
-    )
-
-    type_rows = (
-        db.query(
-            Incident.incident_type,
-            func.count(Incident.id),
-        )
-        .group_by(Incident.incident_type)
-        .all()
-    )
-
-    incident_types = {
-        incident_type or "UNKNOWN": count
-        for incident_type, count in type_rows
-    }
-
-    return {
-        "total_incidents": total,
-        "status": {
-            "received": received,
-            "analyzed": analyzed,
-            "approved": approved,
-            "dispatched": dispatched,
-        },
-        "risk": {
-            "critical": critical,
-            "high": high,
-            "medium": medium,
-            "low": low,
-        },
-        "incident_types": incident_types,
-    }
+    return get_incident_or_404(incident_id, db, user)
 
 
-@router.get(
-    "/incident/{incident_id}/timeline",
-)
-async def incident_timeline(
-        incident_id: int,
-        db: Session = Depends(get_db),
+@router.get("/incident/{incident_id}/timeline")
+def timeline(
+    incident_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    get_incident_or_404(
-        incident_id,
-        db,
-    )
-
+    get_incident_or_404(incident_id, db, user)
     events = (
         db.query(AgentEvent)
-        .filter(
-            AgentEvent.incident_id == incident_id
-        )
-        .order_by(AgentEvent.timestamp.asc())
+        .filter(AgentEvent.incident_id == incident_id)
+        .order_by(AgentEvent.id)
         .all()
     )
-
     return {
         "incident_id": incident_id,
         "events": [
             {
-                "id": event.id,
-                "agent": event.agent_name,
-                "event_type": event.event_type,
-                "summary": event.summary,
-                "timestamp": event.timestamp,
+                "id": e.id,
+                "agent": e.agent_name,
+                "event_type": e.event_type,
+                "summary": e.summary,
+                "timestamp": e.timestamp.isoformat() + "Z",
             }
-            for event in events
+            for e in events
         ],
     }
 
 
-@router.get(
-    "/incident/{incident_id}/facilities",
-)
-async def get_nearby_facilities(
-        incident_id: int,
-        db: Session = Depends(get_db),
+@router.get("/incident/{incident_id}/analysis")
+def analysis(
+    incident_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
-    )
+    get_incident_or_404(incident_id, db, user)
+    result = db.get(IncidentAnalysis, incident_id)
+    return json.loads(result.payload) if result else None
 
+
+@router.post("/incident/{incident_id}/workflow")
+async def complete_incident_workflow(
+    incident_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    incident = get_incident_or_404(incident_id, db, user)
+    if incident.status not in {"RECEIVED", "CLASSIFIED", "ANALYZED"}:
+        raise HTTPException(409, "Reviewed incidents cannot be reanalyzed.")
+    saved = db.get(IncidentAnalysis, incident_id)
+    if saved:
+        return json.loads(saved.payload)
+    initial_status = incident.status
+    rate_limit(db, f"analysis:{user.id}", 20, 3600)
+    classification = await ai_classifier.classify(incident.description)
     facilities = facility_service.find_nearby_facilities(
-        incident.latitude,
-        incident.longitude,
+        incident.latitude, incident.longitude
     )
-
-    return {
-        "incident_id": incident.id,
-        "radius_meters": 500,
-        "critical_radius_meters": 200,
-        "nearby_facilities": facilities,
-    }
-
-
-@router.post(
-    "/incident/{incident_id}/classify",
-)
-async def classify_incident(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
-    )
-
-    result = await ai_classifier.classify(
-        incident.description
-    )
-
-    incident.incident_type = result["incident_type"]
-    incident.status = "CLASSIFIED"
-
-    log_event(
-        db,
-        incident.id,
-        "AIClassifier",
-        "CLASSIFICATION_COMPLETE",
-        f"Incident classified as {result['incident_type']}.",
-    )
-
-    db.commit()
-    db.refresh(incident)
-
-    return {
-        "incident_id": incident.id,
-        **result,
-    }
-
-
-@router.post(
-    "/incident/{incident_id}/risk",
-)
-async def calculate_incident_risk(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
-    )
-
-    facilities = facility_service.find_nearby_facilities(
-        incident.latitude,
-        incident.longitude,
-    )
-
-    result = risk_engine.calculate_risk(
-        incident_type=incident.incident_type,
-        description=incident.description,
-        nearby_facilities=facilities,
-    )
-
-    incident.risk_score = result["score"]
-    incident.risk_level = result["level"]
-
-    log_event(
-        db,
-        incident.id,
-        "RiskEngine",
-        "RISK_CALCULATED",
-        f"Risk calculated as {result['level']} ({result['score']}).",
-    )
-
-    db.commit()
-    db.refresh(incident)
-
-    return {
-        "incident_id": incident.id,
-        "risk_score": result["score"],
-        "risk_level": result["level"],
-        "reasons": result["reasons"],
-        "nearby_facilities": facilities,
-    }
-
-
-@router.post(
-    "/incident/check-duplicate",
-)
-async def check_duplicate(
-        payload: IncidentCreate,
-        db: Session = Depends(get_db),
-):
-    incidents = (
-        db.query(Incident)
-        .order_by(Incident.created_at.desc())
-        .all()
-    )
-
-    return duplicate_detector.find_duplicate(
-        description=payload.description,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
-        incidents=incidents,
-    )
-
-
-@router.post(
-    "/incident/{incident_id}/route",
-)
-async def route_incident(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
-    )
-
-    if not incident.incident_type:
-        raise HTTPException(
-            status_code=400,
-            detail="Incident must be classified first",
-        )
-
-    result = routing_engine.route(
-        incident_type=incident.incident_type,
-        risk_level=incident.risk_level or "MEDIUM",
-    )
-
-    incident.department = result["department"]
-    incident.response_team = result["response_team"]
-
-    log_event(
-        db,
-        incident.id,
-        "RoutingAgent",
-        "INCIDENT_ROUTED",
-        f"Routed to {result['department']} - {result['response_team']}.",
-    )
-
-    db.commit()
-    db.refresh(incident)
-
-    return {
-        "incident_id": incident.id,
-        **result,
-    }
-
-
-@router.post(
-    "/incident/{incident_id}/plan",
-)
-async def plan_incident_response(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
-    )
-
-    if not incident.incident_type:
-        raise HTTPException(
-            status_code=400,
-            detail="Incident must be classified first",
-        )
-
-    facilities = facility_service.find_nearby_facilities(
-        incident.latitude,
-        incident.longitude,
-    )
-
     risk = risk_engine.calculate_risk(
-        incident_type=incident.incident_type,
-        description=incident.description,
-        nearby_facilities=facilities,
+        classification["incident_type"], incident.description, facilities
     )
-
-    incident.risk_score = risk["score"]
-    incident.risk_level = risk["level"]
-
-    routing = routing_engine.route(
-        incident_type=incident.incident_type,
-        risk_level=risk["level"],
+    routing = routing_engine.route(classification["incident_type"], risk["level"])
+    plan = await ai_planner.create_plan(
+        classification["incident_type"],
+        incident.description,
+        risk["level"],
+        risk["score"],
+        routing["department"],
+        routing["response_team"],
+        facilities,
     )
-
-    incident.department = routing["department"]
-    incident.response_team = routing["response_team"]
-
-    result = await ai_planner.create_plan(
-        incident_type=incident.incident_type,
-        description=incident.description,
-        risk_level=risk["level"],
-        risk_score=risk["score"],
-        department=routing["department"],
-        response_team=routing["response_team"],
-        nearby_facilities=facilities,
-    )
-
-    incident.status = "ANALYZED"
-
-    log_event(
-        db,
-        incident.id,
-        "AIPlanner",
-        "RESPONSE_PLAN_CREATED",
-        "AI response plan generated successfully.",
-    )
-
-    db.commit()
-
-    return {
-        "incident_id": incident.id,
+    result = {
+        "classification": classification,
         "risk": risk,
         "routing": routing,
-        "response_plan": result,
+        "response_plan": plan,
+        "nearby_facilities": facilities,
     }
-
-
-@router.post(
-    "/incident/{incident_id}/approve",
-)
-async def approve_incident(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
+    transition(db, incident, initial_status, "ANALYZED")
+    incident.incident_type = classification["incident_type"]
+    incident.risk_score, incident.risk_level = risk["score"], risk["level"]
+    incident.department, incident.response_team = (
+        routing["department"],
+        routing["response_team"],
     )
-
-    if incident.status == "DISPATCHED":
-        raise HTTPException(
-            status_code=400,
-            detail="Incident has already been dispatched",
-        )
-
-    if incident.status == "APPROVED":
-        return {
-            "incident_id": incident.id,
-            "status": "APPROVED",
-            "approved_by": "Demo Operator",
-            "message": "Response plan already approved.",
-        }
-
-    incident.status = "APPROVED"
-
+    db.add(IncidentAnalysis(incident_id=incident_id, payload=json.dumps(result)))
     log_event(
         db,
-        incident.id,
-        "HumanOperator",
-        "PLAN_APPROVED",
-        "Response plan approved by human operator.",
-    )
-
-    db.commit()
-    db.refresh(incident)
-
-    return {
-        "incident_id": incident.id,
-        "status": "APPROVED",
-        "approved_by": "Demo Operator",
-        "message": "Response plan approved for dispatch.",
-    }
-
-
-@router.post(
-    "/incident/{incident_id}/dispatch",
-)
-async def dispatch_incident(
-        incident_id: int,
-        db: Session = Depends(get_db),
-):
-    incident = get_incident_or_404(
         incident_id,
-        db,
+        user.username,
+        "ANALYZED",
+        f"Analysis recorded. Classification: {classification['source']}; plan: {plan['source']}.",
     )
-
-    if incident.status != "APPROVED":
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
         raise HTTPException(
-            status_code=400,
-            detail="Human approval is required before dispatch",
-        )
-
-    if not incident.incident_type:
-        raise HTTPException(
-            status_code=400,
-            detail="Incident must be classified first",
-        )
-
-    routing = routing_engine.route(
-        incident_type=incident.incident_type,
-        risk_level=incident.risk_level or "MEDIUM",
-    )
-
-    incident.department = routing["department"]
-    incident.response_team = routing["response_team"]
-    incident.status = "DISPATCHED"
-
-    result = dispatch_service.create_dispatch(
-        incident_id=incident.id,
-        department=routing["department"],
-        response_team=routing["response_team"],
-        priority=routing["priority"],
-    )
-
-    log_event(
-        db,
-        incident.id,
-        "DispatchAgent",
-        "DISPATCHED",
-        f"{routing['response_team']} dispatched.",
-    )
-
-    db.commit()
-    db.refresh(incident)
-
+            409, "Analysis changed. Refresh the saved assessment."
+        ) from None
     return result
 
 
-@router.post(
-    "/incident/{incident_id}/workflow",
-)
-async def complete_incident_workflow(
-        incident_id: int,
-        db: Session = Depends(get_db),
+@router.post("/incident/{incident_id}/approve")
+def approve(
+    incident_id: int,
+    user: User = Depends(require_operator),
+    db: Session = Depends(get_db),
 ):
-    incident = get_incident_or_404(
-        incident_id,
-        db,
-    )
-
-    if not incident.incident_type:
-        classification = await ai_classifier.classify(
-            incident.description
-        )
-
-        incident.incident_type = classification[
-            "incident_type"
-        ]
-
-        classification_source = classification.get(
-            "source",
-            "ollama",
-        )
-    else:
-        classification = {
-            "incident_type": incident.incident_type,
-            "source": "database",
-        }
-
-        classification_source = "database"
-
-    facilities = facility_service.find_nearby_facilities(
-        incident.latitude,
-        incident.longitude,
-    )
-
-    risk = risk_engine.calculate_risk(
-        incident_type=incident.incident_type,
-        description=incident.description,
-        nearby_facilities=facilities,
-    )
-
-    incident.risk_score = risk["score"]
-    incident.risk_level = risk["level"]
-
-    routing = routing_engine.route(
-        incident_type=incident.incident_type,
-        risk_level=risk["level"],
-    )
-
-    incident.department = routing["department"]
-    incident.response_team = routing["response_team"]
-
-    plan = await ai_planner.create_plan(
-        incident_type=incident.incident_type,
-        description=incident.description,
-        risk_level=risk["level"],
-        risk_score=risk["score"],
-        department=routing["department"],
-        response_team=routing["response_team"],
-        nearby_facilities=facilities,
-    )
-
-    incident.status = "ANALYZED"
-
+    incident = get_incident_or_404(incident_id, db, user)
+    if incident.status != "ANALYZED" or not db.get(IncidentAnalysis, incident_id):
+        raise HTTPException(409, "A saved analysis must be reviewed before approval.")
+    transition(db, incident, "ANALYZED", "APPROVED")
     log_event(
         db,
-        incident.id,
-        "WorkflowAgent",
-        "WORKFLOW_COMPLETED",
-        "Classification, risk assessment, routing and response planning completed.",
+        incident_id,
+        user.username,
+        "APPROVED",
+        "Operator reviewed and approved the saved plan.",
     )
-
     db.commit()
-    db.refresh(incident)
-
     return {
-        "incident": {
-            "id": incident.id,
-            "description": incident.description,
-            "latitude": incident.latitude,
-            "longitude": incident.longitude,
-            "incident_type": incident.incident_type,
-            "risk_score": incident.risk_score,
-            "risk_level": incident.risk_level,
-            "status": incident.status,
-            "department": incident.department,
-            "response_team": incident.response_team,
-        },
-        "classification": classification,
-        "classification_source": classification_source,
-        "risk": risk,
-        "nearby_facilities": facilities,
-        "routing": routing,
-        "response_plan": plan,
-        "next_action": "Human approval required before dispatch",
+        "incident_id": incident_id,
+        "status": "APPROVED",
+        "approved_by": user.username,
     }
+
+
+@router.post("/incident/{incident_id}/assign")
+def assign(
+    incident_id: int,
+    user: User = Depends(require_operator),
+    db: Session = Depends(get_db),
+):
+    incident = get_incident_or_404(incident_id, db, user)
+    if incident.status != "APPROVED":
+        raise HTTPException(
+            409, "Approve the saved plan before recording an assignment."
+        )
+    transition(db, incident, "APPROVED", "ASSIGNED")
+    log_event(
+        db,
+        incident_id,
+        user.username,
+        "ASSIGNED",
+        "Internal assignment recorded. No external service was contacted.",
+    )
+    db.commit()
+    return {
+        "incident_id": incident_id,
+        "status": "ASSIGNED",
+        "external_dispatch": False,
+    }
+
+
+@router.post("/incident/{incident_id}/resolve")
+def resolve(
+    incident_id: int,
+    payload: ResolutionRequest,
+    user: User = Depends(require_operator),
+    db: Session = Depends(get_db),
+):
+    incident = get_incident_or_404(incident_id, db, user)
+    if incident.status != "ASSIGNED":
+        raise HTTPException(409, "Only assigned incidents can be resolved.")
+    transition(db, incident, "ASSIGNED", "RESOLVED")
+    log_event(db, incident_id, user.username, "RESOLVED", payload.note)
+    db.commit()
+    return {"incident_id": incident_id, "status": "RESOLVED"}
+
+
+@router.post("/incident/{incident_id}/dispatch")
+def dispatch(
+    incident_id: int,
+    user: User = Depends(require_operator),
+    db: Session = Depends(get_db),
+):
+    get_incident_or_404(incident_id, db, user)
+    raise HTTPException(
+        503,
+        "External dispatch is not connected. Use internal assignment to record coordination.",
+    )
