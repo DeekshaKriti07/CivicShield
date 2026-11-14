@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import './restore.css'
 import { api } from './services/api'
 import LoginPage from './components/LoginPage'
 import CommandCenter from './components/CommandCenter'
@@ -7,23 +8,27 @@ import IncidentDetail from './components/IncidentDetail'
 import AgentTrace from './components/AgentTrace'
 import ProfilePage from './components/ProfilePage'
 import ThemeToggle from './components/ThemeToggle'
+import LandingPage from './components/LandingPage'
+import { ShieldCheck } from 'lucide-react'
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
-  const [route, setRoute] = useState(
-    window.location.hash.slice(1) || 'incidents',
-  )
+  const [route, setRoute] = useState(window.location.hash.slice(1) || 'home')
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle(
       'dark',
-      localStorage.getItem('civicshield-theme') === 'dark',
+      localStorage.getItem('civicshield-theme') !== 'light',
+    )
+    document.documentElement.classList.toggle(
+      'light',
+      localStorage.getItem('civicshield-theme') === 'light',
     )
     const navigate = () => {
-      setRoute(window.location.hash.slice(1) || 'incidents')
+      setRoute(window.location.hash.slice(1) || 'home')
       window.scrollTo(0, 0)
     }
     const expire = () => {
@@ -59,7 +64,7 @@ export default function App() {
       await api.logout()
       setUser(null)
       setError('')
-      window.location.hash = 'incidents'
+      window.location.hash = 'home'
     } catch (err) {
       setError(err.message)
     } finally {
@@ -85,9 +90,19 @@ export default function App() {
       />
     )
 
+  if (route === 'home')
+    return (
+      <LandingPage
+        error={error}
+        user={user}
+        onLogout={signOut}
+        signingOut={signingOut}
+      />
+    )
+
   const match = route.match(/^incident\/(\d+)(\/trace)?$/)
   return (
-    <>
+    <div className="app-shell">
       <a
         className="skip-link"
         href="#main-content"
@@ -98,15 +113,15 @@ export default function App() {
       >
         Skip to content
       </a>
-      <header className="site-header">
-        <a className="brand" href="#incidents">
-          <span className="brand-mark" aria-hidden="true">
-            CS
-          </span>
-          <span>
+      <header className="console-topbar site-header">
+        <a className="brand" href="#home">
+          <div className="brand-mark">
+            <ShieldCheck size={18} aria-hidden="true" />
+          </div>
+          <div>
             <strong>CivicShield</strong>
-            <small>Incident records</small>
-          </span>
+            <span>CIVIC OPERATIONS</span>
+          </div>
         </a>
         <nav aria-label="Main navigation">
           <a
@@ -126,7 +141,11 @@ export default function App() {
           </button>
         </nav>
       </header>
-      <main id="main-content" tabIndex={-1} className="page">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="console-main restore-page"
+      >
         {error && (
           <p role="alert" className="error">
             {error}
@@ -152,6 +171,6 @@ export default function App() {
         CivicShield records reports and internal decisions. It does not contact
         emergency services.
       </footer>
-    </>
+    </div>
   )
 }

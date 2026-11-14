@@ -1,36 +1,39 @@
 export default function ProfilePage({ user }) {
   return (
-    <>
-      <a className="back-link" href="#incidents">
-        ← Reports
-      </a>
-      <div className="page-heading">
-        <h1>Your account</h1>
-      </div>
-      <section className="panel padded account-panel">
-        <dl>
+    <div className="profile-workspace">
+      <section className="profile-card" aria-labelledby="profile-title">
+        <a className="profile-back" href="#incidents">
+          ← Reports
+        </a>
+        <div className="profile-avatar" aria-hidden="true">
+          {user.username.slice(0, 2).toUpperCase()}
+        </div>
+        <p className="profile-label">ACCOUNT PROFILE</p>
+        <h1 id="profile-title">Your account</h1>
+        <p className="profile-role">{user.role}</p>
+        <div className="profile-details">
           <div>
-            <dt>Username</dt>
-            <dd>{user.username}</dd>
+            <span>USERNAME</span>
+            <strong>{user.username}</strong>
           </div>
           <div>
-            <dt>Role</dt>
-            <dd>{user.role}</dd>
+            <span>ROLE</span>
+            <strong>{user.role}</strong>
           </div>
           <div>
-            <dt>Access</dt>
-            <dd>
+            <span>ACCESS</span>
+            <strong>
               {user.role === 'REPORTER'
-                ? 'Submit and view your own reports'
-                : 'Review reports and record decisions'}
-            </dd>
+                ? 'Your own reports'
+                : 'Civic operations'}
+            </strong>
           </div>
-        </dl>
-        <p className="muted">
+        </div>
+        <p className="field-help">
           Operator access is managed by the administrator. Sign out when using a
           shared computer.
         </p>
       </section>
-    </>
+    </div>
   )
 }

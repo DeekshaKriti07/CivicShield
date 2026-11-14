@@ -7,8 +7,11 @@ async function login(page, username = 'test-operator') {
   await page.getByLabel('Username', { exact: true }).fill(username)
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await accessible(page)
+  await noOverflow(page)
+  await page.getByRole('button', { name: 'Open Console', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: 'Incident register' }),
+    page.getByRole('heading', { name: 'Command Center' }),
   ).toBeVisible()
 }
 async function create(
@@ -56,6 +59,9 @@ test('reporter account, actual report, reload, analysis and logout', async ({
   await expect(page.getByRole('status')).toContainText('Account created')
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await accessible(page)
+  await noOverflow(page)
+  await page.getByRole('button', { name: 'Open Console', exact: true }).click()
   await expect(page.getByText('No reports yet', { exact: true })).toBeVisible()
   await accessible(page)
   await create(page, 'Flooded street near the library')
@@ -84,11 +90,11 @@ test('reporter account, actual report, reload, analysis and logout', async ({
   ).toBeVisible()
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: 'Sign in', exact: true }),
+    page.getByRole('heading', { name: 'Welcome back.', exact: true }),
   ).toBeVisible()
   await page.goto(url)
   await expect(
-    page.getByRole('heading', { name: 'Sign in', exact: true }),
+    page.getByRole('heading', { name: 'Welcome back.', exact: true }),
   ).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -144,13 +150,16 @@ test('incorrect password and expired sessions have recoverable states', async ({
   )
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await accessible(page)
+  await noOverflow(page)
+  await page.getByRole('button', { name: 'Open Console', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: 'Incident register' }),
+    page.getByRole('heading', { name: 'Command Center' }),
   ).toBeVisible()
   await context.clearCookies()
   await page.getByRole('button', { name: 'Refresh records' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Sign in', exact: true }),
+    page.getByRole('heading', { name: 'Welcome back.', exact: true }),
   ).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('session expired')
 })
@@ -164,8 +173,9 @@ test('server outage, validation, theme and profile', async ({ page }) => {
   await page.getByLabel('Longitude', { exact: true }).fill('0')
   await page.getByRole('button', { name: 'Save report', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: 'Incident register' }),
+    page.getByRole('heading', { name: 'Command Center' }),
   ).toBeVisible()
+  await page.getByRole('button', { name: 'Use light theme' }).click()
   await page.getByRole('button', { name: 'Use dark theme' }).click()
   await expect(page.locator('html')).toHaveClass(/dark/)
   await accessible(page)

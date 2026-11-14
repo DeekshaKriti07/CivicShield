@@ -58,19 +58,19 @@ export default function IncidentForm({ onIncidentCreated }) {
     )
   }
   return (
-    <section className="panel form-panel">
-      <p className="eyebrow">New record</p>
+    <section className="form-card">
+      <span className="section-label">NEW INCIDENT</span>
       <h2>Report an incident</h2>
       <p className="muted">
         Describe what you observed and where it happened. Review the coordinates
         before submitting.
       </p>
-      <form onSubmit={submit}>
+      <form className="restore-incident-form" onSubmit={submit}>
         <label>
           Description
           <textarea
             name="description"
-            rows={5}
+            rows={3}
             required
             minLength={3}
             maxLength={5000}
@@ -79,50 +79,55 @@ export default function IncidentForm({ onIncidentCreated }) {
             disabled={busy}
           />
         </label>
-        <button
-          type="button"
-          className="text-button"
-          onClick={locate}
-          disabled={busy || locating}
-        >
-          {locating ? 'Reading location…' : 'Use my current location'}
-        </button>
-        <div className="coordinate-inputs">
-          <label>
-            Latitude
-            <input
-              type="number"
-              name="latitude"
-              min={-90}
-              max={90}
-              step="any"
-              required
-              value={latitude}
-              onChange={(e) => setLatitude(e.target.value)}
-              disabled={busy}
-            />
-          </label>
-          <label>
-            Longitude
-            <input
-              type="number"
-              name="longitude"
-              min={-180}
-              max={180}
-              step="any"
-              required
-              value={longitude}
-              onChange={(e) => setLongitude(e.target.value)}
-              disabled={busy}
-            />
-          </label>
+        <div className="location-fields">
+          <div className="coordinate-inputs">
+            <label>
+              Latitude
+              <input
+                type="number"
+                name="latitude"
+                min={-90}
+                max={90}
+                step="any"
+                required
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                disabled={busy}
+              />
+            </label>
+            <label>
+              Longitude
+              <input
+                type="number"
+                name="longitude"
+                min={-180}
+                max={180}
+                step="any"
+                required
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                disabled={busy}
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            className="text-button"
+            onClick={locate}
+            disabled={busy || locating}
+          >
+            {locating ? 'Reading location…' : 'Use my current location'}
+          </button>{' '}
         </div>
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
-        <button className="primary-button" disabled={busy || locating}>
+        <button
+          className="primary-button form-submit"
+          disabled={busy || locating}
+        >
           {busy ? 'Saving report…' : 'Save report'}
         </button>
       </form>
