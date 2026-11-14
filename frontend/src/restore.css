@@ -887,3 +887,18 @@ html.light .status-assigned {
     gap: 12px;
   }
 }
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  min-height: 28px;
+}
+.landing-nav .nav-launch {
+  display: inline-flex;
+}

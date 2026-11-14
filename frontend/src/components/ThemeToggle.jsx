@@ -4,24 +4,30 @@ export default function ThemeToggle() {
   const [dark, setDark] = useState(
     localStorage.getItem('civicshield-theme') !== 'light',
   )
-  function toggle() {
-    document.documentElement.classList.toggle('dark', !dark)
-    document.documentElement.classList.toggle('light', dark)
-    localStorage.setItem('civicshield-theme', !dark ? 'dark' : 'light')
-    setDark(!dark)
+  function setTheme(nextDark) {
+    document.documentElement.classList.toggle('dark', nextDark)
+    document.documentElement.classList.toggle('light', !nextDark)
+    localStorage.setItem('civicshield-theme', nextDark ? 'dark' : 'light')
+    setDark(nextDark)
   }
   return (
-    <button
-      className="theme-toggle"
-      onClick={toggle}
-      aria-label={dark ? 'Use light theme' : 'Use dark theme'}
-    >
-      <span className={!dark ? 'theme-active' : ''}>
+    <div className="theme-toggle" role="group" aria-label="Color theme">
+      <button
+        className={`theme-option ${!dark ? 'theme-active' : ''}`}
+        onClick={() => setTheme(false)}
+        aria-label="Use light theme"
+        aria-pressed={!dark}
+      >
         <Sun size={12} aria-hidden="true" /> Light
-      </span>
-      <span className={dark ? 'theme-active' : ''}>
+      </button>
+      <button
+        className={`theme-option ${dark ? 'theme-active' : ''}`}
+        onClick={() => setTheme(true)}
+        aria-label="Use dark theme"
+        aria-pressed={dark}
+      >
         <Moon size={12} aria-hidden="true" /> Dark
-      </span>
-    </button>
+      </button>
+    </div>
   )
 }
