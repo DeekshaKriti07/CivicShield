@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -304,3 +304,17 @@ class Evidence(Base):
         DateTime,
         default=utc_now,
     )
+
+
+class IncidentAccess(Base):
+    """Separate table preserves existing incident schema during upgrade."""
+
+    __tablename__ = "incident_access"
+    incident_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+
+
+class IncidentAnalysis(Base):
+    __tablename__ = "incident_analysis"
+    incident_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    payload: Mapped[str] = mapped_column(Text)

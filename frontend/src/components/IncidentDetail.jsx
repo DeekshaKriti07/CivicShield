@@ -1,7 +1,277 @@
-import { useState } from 'react'
-import { ArrowLeft, BrainCircuit, CheckCircle2, ChevronRight, Clock3, Droplets, MapPin, ShieldCheck, Truck, Users, XCircle, Zap } from 'lucide-react'
-import ThemeToggle from './ThemeToggle'
-import { demoIncidents } from '../services/demoIncidents'
-export default function IncidentDetail({incidentId='INC-001',onBack,onOpenTrace}){const base=demoIncidents[incidentId]||demoIncidents['INC-001'];const [approved,setApproved]=useState(false);const [dispatched,setDispatched]=useState(false);const [monitoring,setMonitoring]=useState(false);const [resolved,setResolved]=useState(false);const [water,setWater]=useState(42);const status=resolved?'RESOLVED':monitoring?'MONITORING':dispatched?'DISPATCHED':approved?'APPROVED':'AWAITING APPROVAL';const monitor=()=>{setMonitoring(true);setWater(28);setTimeout(()=>setWater(11),1200)}
- return <div className="app-shell"><header className="console-topbar"><div className="brand"><button className="icon-button" onClick={onBack}><ArrowLeft size={16}/></button><div className="brand-mark"><ShieldCheck size={18}/></div><div><strong>CivicShield</strong><span>INCIDENT WORKSPACE</span></div></div><div className="top-actions"><ThemeToggle/><span className="online"><i/> AI SYSTEM ONLINE</span></div></header><main className="detail-main"><div className="detail-head"><div><span className="section-label">CIVICSHIELD / INCIDENT DETAIL</span><h1>{base.title}</h1><p><span className="mono">{base.id}</span> · {base.location}</p></div><em className={`level ${resolved?'resolved':base.level.toLowerCase()}`}>{status}</em></div><div className="detail-grid"><section className="detail-primary"><div className="panel evidence-panel"><div className="panel-title"><div><span className="section-label">EVIDENCE</span><h2>What was reported</h2></div><span className="confidence"><CheckCircle2 size={14}/> {base.confidence}% confidence</span></div><div className="evidence-placeholder"><div><Droplets size={42}/><strong>Waterlogging evidence</strong><span>Demo incident image · 3 citizen reports fused</span></div></div><div className="description-box"><span className="section-label">CITIZEN DESCRIPTION</span><p>{base.description}</p><div className="coordinate"><MapPin size={14}/> {base.latitude}° N, {base.longitude}° E</div></div></div><div className="panel analysis-detail"><div className="panel-title"><div><span className="section-label">AI REASONING</span><h2>Decision context</h2></div><BrainCircuit size={18}/></div><div className="reason-grid"><div><span>INCIDENT TYPE</span><strong>{base.type}</strong></div><div><span>RISK SCORE</span><strong>{resolved?'18':base.score}/100</strong></div><div><span>CRITICAL FACILITY</span><strong>{base.facility}</strong></div><div><span>REPORT FUSION</span><strong>{base.reports} sources</strong></div></div><div className="reason-note"><Zap size={16}/><p>Critical because the affected road is near a hospital and may interfere with emergency access. The numeric score is produced by deterministic risk rules.</p></div></div><div className="panel response-panel"><div className="panel-title"><div><span className="section-label">RESPONSE PLAN</span><h2>Recommended actions</h2></div><span className="mono">{base.department} · {base.team}</span></div>{['Inspect drainage infrastructure','Deploy water-removal equipment','Place road warning barrier','Coordinate temporary traffic diversion','Monitor water level until safe'].map((x,i)=><div className="plan-row" key={x}><b>0{i+1}</b><span>{x}</span><CheckCircle2 size={15}/></div>)}</div></section><aside className="detail-side"><div className="panel risk-panel"><span className="section-label">RISK ASSESSMENT</span><div className="risk-gauge"><strong>{resolved?'18':base.score}</strong><span>/100</span></div><em className={`level ${resolved?'resolved':base.level.toLowerCase()}`}>{resolved?'LOW AFTER RESPONSE':base.level}</em><div className="risk-mini"><span>Hospital nearby <b>+30</b></span><span>Road blocked <b>+15</b></span><span>Multiple reports <b>+10</b></span><span>Strong evidence <b>+05</b></span></div></div><div className="panel route-panel"><span className="section-label">ROUTING</span><div className="route-main"><ShieldCheck size={18}/><div><strong>{base.department} Department</strong><span>Recommended response unit</span></div></div><div className="team-line"><Users size={15}/><span>{base.team} · Emergency response</span></div></div><div className="panel approval-panel"><span className="section-label">HUMAN CHECKPOINT</span><h2>{resolved?'Incident resolved':approved?'Response approved':dispatched?'Team dispatched':monitoring?'Live monitoring':'Response awaiting approval'}</h2><p>{resolved?'Water level reduced and access conditions restored.':approved?'The recommendation was authorized. The next action is simulated dispatch.':'Review the recommendation before any action is executed.'}</p>{!approved&&!dispatched&&!resolved&&<div className="approval-buttons"><button className="primary-button" onClick={()=>setApproved(true)}><CheckCircle2 size={15}/> Approve response</button><button className="secondary-button"><XCircle size={15}/> Modify plan</button></div>}{approved&&!dispatched&&!resolved&&<button className="primary-button full" onClick={()=>setDispatched(true)}><Truck size={16}/> Dispatch {base.team}</button>}{dispatched&&!monitoring&&!resolved&&<button className="primary-button full" onClick={monitor}><ActivityIcon/><span>Start live monitoring</span></button>}{monitoring&&!resolved&&<div className="monitor-box"><div><Droplets size={16}/><span>WATER LEVEL</span><strong>{water} cm</strong></div><div className="monitor-line"><span style={{width:`${Math.max(12,water/42*100)}%`}}/></div><button className="primary-button full" disabled={water!==11} onClick={()=>setResolved(true)}><CheckCircle2 size={15}/> Confirm resolution</button></div>}{resolved&&<div className="resolved-box"><CheckCircle2 size={22}/><strong>Incident resolved</strong><span>Water level 11 cm · access road restored</span></div>}<button className="trace-open" onClick={onOpenTrace}><BrainCircuit size={15}/> View agent trace <ChevronRight size={14}/></button></div></aside></div></main></div>}
-function ActivityIcon(){return <Clock3 size={16}/>} 
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { api } from '../services/api'
+import { date, Status } from './RecordParts'
+const LiveMap = lazy(() => import('./LiveMap'))
+
+export default function IncidentDetail({ incidentId, user }) {
+  const [record, setRecord] = useState(null)
+  const [analysis, setAnalysis] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [note, setNote] = useState('')
+  const [showMap, setShowMap] = useState(false)
+  const operator = ['OPERATOR', 'ADMIN'].includes(user.role)
+  async function load() {
+    const [incident, result] = await Promise.all([
+      api.incident(incidentId),
+      api.analysis(incidentId),
+    ])
+    setRecord(incident)
+    setAnalysis(result)
+  }
+  useEffect(() => {
+    let active = true
+    Promise.all([api.incident(incidentId), api.analysis(incidentId)])
+      .then(([i, a]) => {
+        if (active) {
+          setRecord(i)
+          setAnalysis(a)
+        }
+      })
+      .catch((err) => {
+        if (active) setError(err.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [incidentId])
+  async function action(fn) {
+    setBusy(true)
+    setError('')
+    try {
+      await fn()
+      await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (loading) return <p role="status">Loading report…</p>
+  if (!record)
+    return (
+      <>
+        <a href="#incidents" className="back-link">
+          ← Reports
+        </a>
+        <p role="alert" className="error">
+          {error || 'Report unavailable.'}
+        </p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </>
+    )
+  return (
+    <>
+      <a href="#incidents" className="back-link">
+        ← Reports
+      </a>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Report #{record.id}</p>
+          <h1>Incident record</h1>
+          <p className="muted">Created {date(record.created_at)}</p>
+        </div>
+        <Status value={record.status} />
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="detail-layout">
+        <div className="detail-stack">
+          <section className="panel padded">
+            <h2>Reported observation</h2>
+            <p className="report-description">{record.description}</p>
+            <dl>
+              <div>
+                <dt>Coordinates</dt>
+                <dd>
+                  {record.latitude}, {record.longitude}
+                </dd>
+              </div>
+              <div>
+                <dt>Classification</dt>
+                <dd>{record.incident_type || 'Not analyzed'}</dd>
+              </div>
+            </dl>
+            <button
+              className="text-button"
+              onClick={() => setShowMap(!showMap)}
+            >
+              {showMap ? 'Hide map' : 'Show reported location'}
+            </button>
+            {showMap && (
+              <Suspense fallback={<p>Loading map…</p>}>
+                <LiveMap incident={record} />
+              </Suspense>
+            )}
+          </section>
+          <section className="panel padded">
+            <div className="panel-heading">
+              <h2>Assessment</h2>
+              {analysis && (
+                <span className="muted">
+                  {analysis.classification.source === 'ollama'
+                    ? 'Model classification'
+                    : 'Keyword rules'}
+                </span>
+              )}
+            </div>
+            {!analysis ? (
+              <p className="muted">
+                No saved assessment. Run analysis to classify the report and
+                draft a plan for review.
+              </p>
+            ) : (
+              <>
+                <p className="field-help">
+                  This assessment is a recommendation. It does not verify the
+                  report or measure conditions on site.
+                </p>
+                <dl>
+                  <div>
+                    <dt>Rule score</dt>
+                    <dd>
+                      {analysis.risk.score}/100 · {analysis.risk.level}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Suggested department</dt>
+                    <dd>{analysis.routing.department}</dd>
+                  </div>
+                  <div>
+                    <dt>Suggested team</dt>
+                    <dd>{analysis.routing.response_team}</dd>
+                  </div>
+                </dl>
+                <h3>Score factors</h3>
+                {analysis.risk.reasons.length ? (
+                  <ul className="plain-list">
+                    {analysis.risk.reasons.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No configured risk factors matched.</p>
+                )}
+                <p className="field-help">
+                  Nearby facility matches: {analysis.nearby_facilities.length}.
+                  Only configured facility records are considered; this is not a
+                  complete directory.
+                </p>
+              </>
+            )}
+          </section>
+          {analysis && (
+            <section className="panel padded">
+              <div className="panel-heading">
+                <h2>Draft response plan</h2>
+                <span className="muted">
+                  {analysis.response_plan.source === 'ollama'
+                    ? 'Model draft'
+                    : 'Rule template'}
+                </span>
+              </div>
+              <p>{analysis.response_plan.summary}</p>
+              <ol className="plan-list">
+                {analysis.response_plan.actions.map((a, i) => (
+                  <li key={i}>{a.action}</li>
+                ))}
+              </ol>
+              {analysis.response_plan.safety_notes.map((n, i) => (
+                <p key={i} className="field-help">
+                  {n}
+                </p>
+              ))}
+            </section>
+          )}
+        </div>
+        <aside className="panel padded action-panel">
+          <p className="eyebrow">Next decision</p>
+          <h2>Review and record</h2>
+          <p className="muted">
+            Assignments are internal records. No responder or outside service is
+            notified.
+          </p>
+          {!analysis &&
+            ['RECEIVED', 'CLASSIFIED', 'ANALYZED'].includes(record.status) && (
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => action(() => api.workflow(incidentId))}
+              >
+                {busy ? 'Analyzing report…' : 'Run analysis'}
+              </button>
+            )}
+          {analysis &&
+            record.status === 'ANALYZED' &&
+            (operator ? (
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => action(() => api.approve(incidentId))}
+              >
+                Approve reviewed plan
+              </button>
+            ) : (
+              <p>Awaiting operator review.</p>
+            ))}
+          {record.status === 'APPROVED' && operator && (
+            <button
+              className="primary-button"
+              disabled={busy}
+              onClick={() => action(() => api.assign(incidentId))}
+            >
+              Record internal assignment
+            </button>
+          )}
+          {record.status === 'ASSIGNED' && operator && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                action(() => api.resolve(incidentId, note))
+              }}
+            >
+              <label>
+                Resolution note
+                <textarea
+                  required
+                  minLength={10}
+                  maxLength={2000}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={busy}
+                />
+              </label>
+              <p className="field-help">
+                Record what was checked and how the report was resolved.
+              </p>
+              <button className="primary-button" disabled={busy}>
+                Record resolution
+              </button>
+            </form>
+          )}
+          {record.status === 'RESOLVED' && (
+            <p>Resolution recorded. See the history for the operator’s note.</p>
+          )}
+          {busy && (
+            <p role="status" className="field-help">
+              Saving…
+            </p>
+          )}
+          <a
+            className="secondary-button block-link"
+            href={`#incident/${incidentId}/trace`}
+          >
+            View record history
+          </a>
+        </aside>
+      </div>
+    </>
+  )
+}

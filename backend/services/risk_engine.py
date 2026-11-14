@@ -3,14 +3,15 @@ from typing import Any
 
 class RiskEngine:
     def calculate_risk(
-            self,
-            incident_type: str | None,
-            description: str,
-            nearby_facilities: list[dict[str, Any]],
-            report_count: int = 1,
-            road_blocked: bool = False,
+        self,
+        incident_type: str | None,
+        description: str,
+        nearby_facilities: list[dict[str, Any]],
+        report_count: int = 1,
+        road_blocked: bool = False,
     ) -> dict[str, Any]:
 
+        incident_type = incident_type.lower() if incident_type else None
         score = 0
         reasons = []
 
@@ -39,13 +40,13 @@ class RiskEngine:
 
         # Infer flood from the report when incident_type is not set.
         if incident_type is None and any(
-                word in text
-                for word in [
-                    "flood",
-                    "flooded",
-                    "waterlogging",
-                    "water logged",
-                ]
+            word in text
+            for word in [
+                "flood",
+                "flooded",
+                "waterlogging",
+                "water logged",
+            ]
         ):
             score += 25
             reasons.append("Flood indicators detected")
@@ -61,23 +62,18 @@ class RiskEngine:
             score += min(
                 len(critical_facilities) * 30,
                 30,
-                )
-
-            reasons.append(
-                f"{len(critical_facilities)} critical "
-                "facility nearby"
             )
+
+            reasons.append(f"{len(critical_facilities)} critical facility nearby")
 
         # Other nearby facilities
         if nearby_facilities:
             score += min(
                 len(nearby_facilities) * 5,
                 15,
-                )
-
-            reasons.append(
-                f"{len(nearby_facilities)} nearby facilities"
             )
+
+            reasons.append(f"{len(nearby_facilities)} nearby facilities")
 
         # Road blockage
         if road_blocked:
@@ -85,15 +81,15 @@ class RiskEngine:
             reasons.append("Road blockage reported")
 
         elif any(
-                word in text
-                for word in [
-                    "road blocked",
-                    "roadblock",
-                    "ambulance",
-                    "cannot get through",
-                    "can't get through",
-                    "difficulty getting through",
-                ]
+            word in text
+            for word in [
+                "road blocked",
+                "roadblock",
+                "ambulance",
+                "cannot get through",
+                "can't get through",
+                "difficulty getting through",
+            ]
         ):
             score += 15
             reasons.append("Possible road access disruption")

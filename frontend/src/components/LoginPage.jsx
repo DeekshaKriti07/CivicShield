@@ -1,85 +1,132 @@
 import { useState } from 'react'
 import { api } from '../services/api'
-import { saveAuth } from '../auth/auth'
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin, connectionError, onRetry }) {
+  const [register, setRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
-
-  async function handleSubmit(event) {
+  async function submit(event) {
     event.preventDefault()
     setError('')
+    setNotice('')
     setLoading(true)
-
     try {
-      const data = await api.login(username, password)
-      saveAuth(data)
-      onLogin()
+      if (register) {
+        await api.register(username.trim(), password)
+        setRegister(false)
+        setPassword('')
+        setNotice('Account created. Sign in with your new password.')
+      } else {
+        onLogin(await api.login(username.trim(), password))
+        setPassword('')
+      }
     } catch (err) {
-      setError(err.message || 'Invalid username or password')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
-
   return (
     <main className="auth-page">
-      <div className="auth-card">
+      <section className="auth-card" aria-labelledby="auth-title">
         <div className="auth-brand">
-          <div className="auth-mark">CS</div>
+          <div className="auth-mark" aria-hidden="true">
+            CS
+          </div>
           <div>
             <strong>CivicShield</strong>
             <span>CIVIC INCIDENT RESPONSE</span>
           </div>
         </div>
-
         <div className="auth-heading">
-          <p>SECURE OPERATOR ACCESS</p>
-          <h1>Welcome back.</h1>
+          <p>{register ? 'REPORTER REGISTRATION' : 'ACCOUNT ACCESS'}</p>
+          <h1 id="auth-title">
+            {register ? 'Create an account' : 'Welcome back.'}
+          </h1>
           <span>
-            Sign in to monitor incidents, coordinate response,
-            and manage civic operations.
+            {register
+              ? 'Create an account to submit and track your reports.'
+              : 'Sign in to monitor incidents and review civic reports.'}
           </span>
         </div>
-
-        <form onSubmit={handleSubmit}>
+        {connectionError && (
+          <div role="alert" className="error">
+            {connectionError}{' '}
+            <button className="text-button" onClick={onRetry}>
+              Retry connection
+            </button>
+          </div>
+        )}
+        {notice && (
+          <p className="notice" role="status">
+            {notice}
+          </p>
+        )}
+        <form onSubmit={submit}>
           <label>
             Username
             <input
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Enter username"
+              name="username"
               autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
+              minLength={3}
+              maxLength={50}
+              pattern={register ? '[A-Za-z0-9_.-]+' : undefined}
+              disabled={loading}
             />
           </label>
-
           <label>
             Password
             <input
+              name="password"
               type="password"
+              autoComplete={register ? 'new-password' : 'current-password'}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter password"
-              autoComplete="current-password"
+              onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={register ? 12 : 1}
+              maxLength={128}
+              disabled={loading}
             />
           </label>
-
-          {error && <div className="auth-error">{error}</div>}
-
-          <button type="submit" disabled={loading}>
-            {loading ? 'AUTHENTICATING...' : 'SIGN IN'}
+          {register && (
+            <p className="field-help">
+              Use at least 12 characters. Keep this password somewhere safe;
+              password recovery is not available.
+            </p>
+          )}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="primary-button" disabled={loading}>
+            {loading ? 'Please wait…' : register ? 'Create account' : 'Sign in'}
           </button>
         </form>
-
+        <button
+          className="text-button auth-switch"
+          disabled={loading}
+          onClick={() => {
+            setRegister(!register)
+            setError('')
+            setNotice('')
+            setPassword('')
+          }}
+        >
+          {register
+            ? 'Already have an account? Sign in'
+            : 'Create a reporter account'}
+        </button>
         <div className="auth-footer">
-          Authorized CivicShield operators only
+          Public accounts submit reports. Operator access is managed separately.
         </div>
-      </div>
+      </section>
     </main>
   )
 }

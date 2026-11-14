@@ -1,58 +1,39 @@
-import { getUser, logout } from '../auth/auth'
-
-export default function ProfilePage({ onBack, onLogout }) {
-  const user = getUser()
-
-  function handleLogout() {
-    logout()
-    onLogout()
-  }
-
+export default function ProfilePage({ user }) {
   return (
-    <main className="profile-page">
-      <section className="profile-card">
-        <button className="profile-back" onClick={onBack}>
-          ← Back
-        </button>
-
-        <div className="profile-avatar">
-          {(user?.username || 'OP').slice(0, 2).toUpperCase()}
+    <div className="profile-workspace">
+      <section className="profile-card" aria-labelledby="profile-title">
+        <a className="profile-back" href="#incidents">
+          ← Reports
+        </a>
+        <div className="profile-avatar" aria-hidden="true">
+          {user.username.slice(0, 2).toUpperCase()}
         </div>
-
-        <p className="profile-label">OPERATOR PROFILE</p>
-
-        <h1>{user?.username || 'Operator'}</h1>
-
-        <p className="profile-role">
-          {user?.role || 'OPERATOR'}
-        </p>
-
+        <p className="profile-label">ACCOUNT PROFILE</p>
+        <h1 id="profile-title">Your account</h1>
+        <p className="profile-role">{user.role}</p>
         <div className="profile-details">
           <div>
             <span>USERNAME</span>
-            <strong>{user?.username || '—'}</strong>
+            <strong>{user.username}</strong>
           </div>
-
           <div>
             <span>ROLE</span>
-            <strong>{user?.role || '—'}</strong>
+            <strong>{user.role}</strong>
           </div>
-
-          <div>
-            <span>SESSION</span>
-            <strong>AUTHENTICATED</strong>
-          </div>
-
           <div>
             <span>ACCESS</span>
-            <strong>CIVIC OPERATIONS</strong>
+            <strong>
+              {user.role === 'REPORTER'
+                ? 'Your own reports'
+                : 'Civic operations'}
+            </strong>
           </div>
         </div>
-
-        <button className="profile-logout" onClick={handleLogout}>
-          SIGN OUT
-        </button>
+        <p className="field-help">
+          Operator access is managed by the administrator. Sign out when using a
+          shared computer.
+        </p>
       </section>
-    </main>
+    </div>
   )
 }
