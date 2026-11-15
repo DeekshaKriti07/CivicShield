@@ -1,6 +1,8 @@
 
 # CivicShield
 
+[Open the live app](https://civicshield-app.onrender.com/)
+
 > **AI-Powered Autonomous Civic Incident Response & Resolution Platform**
 
 CivicShield is an AI-powered civic incident response platform that transforms citizen-reported incidents into structured, prioritized, and human-approved response actions.
@@ -287,8 +289,7 @@ AI-assisted incident analysis
 Deterministic risk engine
 Rule-based routing and facility awareness
 Deployment
-Vercel — Frontend
-Render — Backend
+Render — Frontend and backend
 GitHub — Source Control
 Project Structure
 CivicShield/
@@ -401,29 +402,15 @@ Add:
 
 VITE_API_BASE_URL=http://localhost:8000
 
-For production, set the Vercel environment variable:
-
-VITE_API_BASE_URL=https://civicshield-2xrk.onrender.com
 Production Deployment
-Frontend
 
-The frontend is deployed using Vercel.
+The frontend and backend are hosted together on Render.
 
 Live application:
-
-https://civic-shield-eight.vercel.app/
-
-Backend
-
-The backend is deployed using Render.
-
-Backend:
-
-https://civicshield-2xrk.onrender.com/
+https://civicshield-app.onrender.com/
 
 Health endpoint:
-
-https://civicshield-2xrk.onrender.com/health
+https://civicshield-app.onrender.com/health
 
 Demo Workflow
 
@@ -577,13 +564,8 @@ GitHub:
 
 https://github.com/DeekshaKriti07/CivicShield
 
-Live Frontend:
-
-https://civic-shield-eight.vercel.app/
-
-Live Backend:
-
-https://civicshield-2xrk.onrender.com/
+Live application:
+https://civicshield-app.onrender.com/
 
 License
 
@@ -812,8 +794,7 @@ AI-assisted incident analysis
 Deterministic risk engine
 Rule-based routing and facility awareness
 Deployment
-Vercel — Frontend
-Render — Backend
+Render — Frontend and backend
 GitHub — Source Control
 Project Structure
 CivicShield/
@@ -910,25 +891,15 @@ Add:
 
 VITE_API_BASE_URL=http://localhost:8000
 
-For production:
-
-VITE_API_BASE_URL=https://civicshield-2xrk.onrender.com
 Production Deployment
-Frontend
+
+The frontend and backend are hosted together on Render.
 
 Live application:
-
-https://civic-shield-eight.vercel.app/
-
-Backend
-
-Live API:
-
-https://civicshield-2xrk.onrender.com/
+https://civicshield-app.onrender.com/
 
 Health endpoint:
-
-https://civicshield-2xrk.onrender.com/health
+https://civicshield-app.onrender.com/health
 
 Demo Workflow
 Login to CivicShield.
@@ -1021,11 +992,8 @@ Project Links
 GitHub:
 https://github.com/DeekshaKriti07/CivicShield
 
-Live Frontend:
-https://civic-shield-eight.vercel.app/
-
-Live Backend:
-https://civicshield-2xrk.onrender.com/
+Live application:
+https://civicshield-app.onrender.com/
 
 License
 
