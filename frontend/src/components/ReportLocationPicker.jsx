@@ -51,7 +51,7 @@ export default function ReportLocationPicker({ latitude, longitude, onSelect, di
           2: 'Your device could not determine its location. Search or pin the place instead.',
           3: 'Location detection timed out. Try again, or search/pin the place.',
         }
-        setMessage(reasons[error.code] || 'Location could not be read. Search or pin the place instead.')
+        setMessage(reasons[error.code] || 'Location could not be read. Search or click the map instead.')
         setLocating(false)
       },
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
