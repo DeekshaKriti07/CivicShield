@@ -317,6 +317,15 @@ class EvidenceAsset(Base):
     content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
+class EvidenceGeotag(Base):
+    __tablename__ = "evidence_geotags"
+
+    evidence_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+
+
 class IncidentAccess(Base):
     """Separate table preserves existing incident schema during upgrade."""
 

@@ -80,12 +80,17 @@ export const api = {
   timeline: (id) => request(`/incident/${id}/timeline`),
   analysis: (id) => request(`/incident/${id}/analysis`),
   createIncident: (payload) => post('/incident', payload),
-  createIncidentWithEvidence: (payload, evidence) => {
+  createIncidentWithEvidence: (payload, evidence, geotag) => {
     const form = new FormData()
     form.append('description', payload.description)
     form.append('latitude', String(payload.latitude))
     form.append('longitude', String(payload.longitude))
     form.append('evidence', evidence)
+    if (geotag) {
+      form.append('evidence_latitude', String(geotag.latitude))
+      form.append('evidence_longitude', String(geotag.longitude))
+      form.append('evidence_location_source', geotag.source)
+    }
     return request('/incident-with-evidence', { method: 'POST', body: form })
   },
   workflow: (id) => post(`/incident/${id}/workflow`),

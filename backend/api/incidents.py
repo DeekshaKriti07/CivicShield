@@ -14,6 +14,7 @@ from backend.models import (
     AgentEvent,
     Evidence,
     EvidenceAsset,
+    EvidenceGeotag,
     Incident,
     IncidentAccess,
     IncidentAnalysis,
@@ -98,6 +99,9 @@ async def create_incident_with_evidence(
     description: str = Form(min_length=3, max_length=5000),
     latitude: float = Form(ge=-90, le=90),
     longitude: float = Form(ge=-180, le=180),
+    evidence_latitude: float | None = Form(default=None, ge=-90, le=90),
+    evidence_longitude: float | None = Form(default=None, ge=-180, le=180),
+    evidence_location_source: str | None = Form(default=None, pattern="^(camera|exif)$"),
     evidence: UploadFile = File(),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -140,6 +144,15 @@ async def create_incident_with_evidence(
             content=content,
         )
     )
+    if evidence_latitude is not None and evidence_longitude is not None:
+        db.add(
+            EvidenceGeotag(
+                evidence_id=evidence_record.id,
+                latitude=evidence_latitude,
+                longitude=evidence_longitude,
+                source=evidence_location_source or "exif",
+            )
+        )
     log_event(
         db,
         incident.id,
@@ -191,15 +204,25 @@ def incident_evidence(
         .order_by(Evidence.id)
         .all()
     )
-    return [
-        {
+    result = []
+    for evidence, asset in rows:
+        geotag = db.get(EvidenceGeotag, evidence.id)
+        result.append({
             "id": evidence.id,
             "filename": asset.filename,
             "content_type": asset.content_type,
             "created_at": evidence.created_at,
-        }
-        for evidence, asset in rows
-    ]
+            "geotag": (
+                {
+                    "latitude": geotag.latitude,
+                    "longitude": geotag.longitude,
+                    "source": geotag.source,
+                }
+                if geotag
+                else None
+            ),
+        })
+    return result
 
 
 @router.get("/incident/{incident_id}/evidence/{evidence_id}/image")

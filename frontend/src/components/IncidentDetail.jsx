@@ -124,6 +124,11 @@ export default function IncidentDetail({ incidentId, user }) {
                       alt={`Evidence attached to report ${record.id}`}
                     />
                     <figcaption>{item.filename}</figcaption>
+                    {item.geotag && (
+                      <p className="evidence-geotag">
+                        {item.geotag.source === 'camera' ? 'Capture location' : 'Embedded photo geotag'}: {item.geotag.latitude}, {item.geotag.longitude}
+                      </p>
+                    )}
                   </figure>
                 ))}
               </div>

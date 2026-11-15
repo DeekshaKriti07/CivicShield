@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import exifr from 'exifr'
 import { api } from '../services/api'
 import ReportLocationPicker from './ReportLocationPicker'
@@ -11,12 +11,25 @@ export default function IncidentForm({ onIncidentCreated }) {
   const [photoLocation, setPhotoLocation] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const cameraInput = useRef(null)
+  const galleryInput = useRef(null)
 
   useEffect(() => () => {
     if (evidencePreview) URL.revokeObjectURL(evidencePreview)
   }, [evidencePreview])
 
-  async function selectEvidence(event) {
+  function captureLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('Location is not supported.'))
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude, source: 'camera' }),
+        reject,
+        { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+      )
+    })
+  }
+
+  async function selectEvidence(event, source) {
     const file = event.target.files?.[0]
     setPhotoLocation(null)
     setError('')
@@ -37,10 +50,21 @@ export default function IncidentForm({ onIncidentCreated }) {
     }
     setEvidence(file)
     setEvidencePreview(URL.createObjectURL(file))
+    if (source === 'camera') {
+      try {
+        const capturedLocation = await captureLocation()
+        setPhotoLocation(capturedLocation)
+        setLatitude(String(capturedLocation.latitude))
+        setLongitude(String(capturedLocation.longitude))
+      } catch {
+        setError('Photo captured, but its geotag could not be recorded. Enable device location and try the camera again, or use the map pin.')
+      }
+      return
+    }
     try {
       const gps = await exifr.gps(file)
       if (Number.isFinite(gps?.latitude) && Number.isFinite(gps?.longitude)) {
-        setPhotoLocation({ latitude: gps.latitude, longitude: gps.longitude })
+        setPhotoLocation({ latitude: gps.latitude, longitude: gps.longitude, source: 'exif' })
       }
     } catch {
       setPhotoLocation(null)
@@ -67,7 +91,7 @@ export default function IncidentForm({ onIncidentCreated }) {
         longitude: Number(longitude),
       }
       const incident = evidence
-        ? await api.createIncidentWithEvidence(payload, evidence)
+        ? await api.createIncidentWithEvidence(payload, evidence, photoLocation)
         : await api.createIncident(payload)
       onIncidentCreated(incident)
       setDescription('')
@@ -103,14 +127,29 @@ export default function IncidentForm({ onIncidentCreated }) {
               disabled={busy}
             />
           </label>
-          <label className="evidence-picker">
+          <div className="evidence-picker">
             <span>Photo evidence <em>Optional</em></span>
             <input
+              ref={cameraInput}
+              className="evidence-native-input"
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={selectEvidence}
+              capture="environment"
+              onChange={(event) => selectEvidence(event, 'camera')}
               disabled={busy}
             />
+            <input
+              ref={galleryInput}
+              className="evidence-native-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => selectEvidence(event, 'gallery')}
+              disabled={busy}
+            />
+            <div className="evidence-source-actions">
+              <button type="button" onClick={() => cameraInput.current?.click()} disabled={busy}>Take geotagged photo</button>
+              <button type="button" onClick={() => galleryInput.current?.click()} disabled={busy}>Choose from gallery</button>
+            </div>
             <div className="evidence-picker-body">
               {evidencePreview ? (
                 <img src={evidencePreview} alt="Selected incident evidence preview" />
@@ -123,13 +162,13 @@ export default function IncidentForm({ onIncidentCreated }) {
                 {evidence && (
                   <small className={photoLocation ? 'geotag-found' : ''}>
                     {photoLocation
-                      ? `Geotag found: ${photoLocation.latitude.toFixed(6)}, ${photoLocation.longitude.toFixed(6)}`
+                      ? `${photoLocation.source === 'camera' ? 'Capture location recorded' : 'Photo geotag found'}: ${photoLocation.latitude.toFixed(6)}, ${photoLocation.longitude.toFixed(6)}`
                       : 'No GPS geotag found; the image can still be submitted.'}
                   </small>
                 )}
               </div>
             </div>
-          </label>
+          </div>
           {photoLocation && (
             <button
               type="button"
