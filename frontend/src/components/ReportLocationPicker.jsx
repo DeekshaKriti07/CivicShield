@@ -54,7 +54,7 @@ export default function ReportLocationPicker({ latitude, longitude, onSelect, di
         setMessage(reasons[error.code] || 'Location could not be read. Search or click the map instead.')
         setLocating(false)
       },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
+      { enableHighAccuracy: false, timeout: 25_000, maximumAge: 300_000 },
     )
   }
 
@@ -137,10 +137,9 @@ export default function ReportLocationPicker({ latitude, longitude, onSelect, di
       <div className="report-location-map">
         <MapContainer center={position} zoom={15} scrollWheelZoom>
           <TileLayer
-            attribution="&copy; OpenStreetMap contributors &copy; CARTO"
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            subdomains="abcd"
-            maxZoom={20}
+            attribution="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI"
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
           />
           {accuracy && <Circle center={position} radius={accuracy} pathOptions={{ color: '#22d3ee', weight: 1, fillOpacity: 0.08 }} />}
           <CircleMarker center={position} radius={8} pathOptions={{ color: '#fff', weight: 3, fillColor: '#22d3ee', fillOpacity: 1 }} />

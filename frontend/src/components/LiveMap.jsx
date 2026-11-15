@@ -11,10 +11,9 @@ export default function LiveMap({ incident }) {
         className="leaflet-map"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={20}
+          attribution="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI"
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={19}
         />
         <CircleMarker center={position} radius={8}>
           <Popup>Reported location · #{incident.id}</Popup>
@@ -22,7 +21,7 @@ export default function LiveMap({ incident }) {
       </MapContainer>
       <p className="field-help">
         Reported coordinates, not a verified location. Map tiles are provided by
-        OpenStreetMap and CARTO.
+        Esri.
       </p>
     </div>
   )
