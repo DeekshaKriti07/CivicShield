@@ -7,10 +7,15 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { api } from '../services/api'
+import LocationPicker from './LocationPicker'
 
 export default function IncidentForm({ onIncidentCreated }) {
   const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('11.0168, 76.9558')
+  const [location, setLocation] = useState({
+    latitude: 11.0168,
+    longitude: 76.9558,
+    label: 'Hospital Access Road, Coimbatore'
+  })
   const [image, setImage] = useState(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -26,12 +31,10 @@ export default function IncidentForm({ onIncidentCreated }) {
     setError('')
 
     try {
-      const [lat, lon] = location.split(',').map(Number)
-
       const incident = await api.createIncident({
         description: description.trim(),
-        latitude: Number.isFinite(lat) ? lat : 11.0168,
-        longitude: Number.isFinite(lon) ? lon : 76.9558
+        latitude: location.latitude,
+        longitude: location.longitude
       })
 
       const normalizedIncident = {
@@ -39,9 +42,9 @@ export default function IncidentForm({ onIncidentCreated }) {
         title: incident.title || 'New civic incident',
         type: incident.type || 'Pending analysis',
         description: incident.description || description.trim(),
-        location: incident.location || 'Citizen reported location · Coimbatore',
-        latitude: incident.latitude ?? (Number.isFinite(lat) ? lat : 11.0168),
-        longitude: incident.longitude ?? (Number.isFinite(lon) ? lon : 76.9558),
+        location: incident.location || location.label || 'Citizen pinned location',
+        latitude: incident.latitude ?? location.latitude,
+        longitude: incident.longitude ?? location.longitude,
         score: incident.score ?? incident.risk_score ?? 0,
         level: incident.level || 'ANALYZING',
         department: incident.department || 'AI ROUTING PENDING',
@@ -129,18 +132,9 @@ export default function IncidentForm({ onIncidentCreated }) {
             />
           </label>
 
-          <label>
-            <span>Location</span>
-
-            <div className="input-icon">
-              <MapPin size={15} />
-
-              <input
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                placeholder="Latitude, Longitude"
-              />
-            </div>
+          <label className="location-field">
+            <span><MapPin size={12} /> Location</span>
+            <LocationPicker value={location} onChange={setLocation} />
           </label>
 
           <label className="file-drop">
