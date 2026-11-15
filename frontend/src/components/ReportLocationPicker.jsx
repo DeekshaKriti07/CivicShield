@@ -27,8 +27,8 @@ export default function ReportLocationPicker({ latitude, longitude, onSelect, di
   const [accuracy, setAccuracy] = useState(null)
   const [message, setMessage] = useState('Search for a place or click the map to pin the incident.')
 
-  const lat = Number(latitude)
-  const lon = Number(longitude)
+  const lat = latitude === '' ? Number.NaN : Number(latitude)
+  const lon = longitude === '' ? Number.NaN : Number(longitude)
   const position = Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : FALLBACK
 
   function locate() {
