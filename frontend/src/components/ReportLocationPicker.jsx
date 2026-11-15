@@ -136,7 +136,12 @@ export default function ReportLocationPicker({ latitude, longitude, onSelect, di
 
       <div className="report-location-map">
         <MapContainer center={position} zoom={15} scrollWheelZoom>
-          <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer
+            attribution="&copy; OpenStreetMap contributors &copy; CARTO"
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            subdomains="abcd"
+            maxZoom={20}
+          />
           {accuracy && <Circle center={position} radius={accuracy} pathOptions={{ color: '#22d3ee', weight: 1, fillOpacity: 0.08 }} />}
           <CircleMarker center={position} radius={8} pathOptions={{ color: '#fff', weight: 3, fillColor: '#22d3ee', fillOpacity: 1 }} />
           <MapInteraction position={position} onSelect={(nextLat, nextLon) => {

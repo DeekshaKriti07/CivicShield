@@ -11,8 +11,10 @@ export default function LiveMap({ incident }) {
         className="leaflet-map"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={20}
         />
         <CircleMarker center={position} radius={8}>
           <Popup>Reported location · #{incident.id}</Popup>
@@ -20,7 +22,7 @@ export default function LiveMap({ incident }) {
       </MapContainer>
       <p className="field-help">
         Reported coordinates, not a verified location. Map tiles are provided by
-        OpenStreetMap.
+        OpenStreetMap and CARTO.
       </p>
     </div>
   )
