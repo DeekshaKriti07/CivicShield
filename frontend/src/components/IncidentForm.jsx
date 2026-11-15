@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { api } from '../services/api'
+import ReportLocationPicker from './ReportLocationPicker'
 export default function IncidentForm({ onIncidentCreated }) {
   const [description, setDescription] = useState('')
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
   const [busy, setBusy] = useState(false)
-  const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
   async function submit(event) {
     event.preventDefault()
@@ -35,28 +35,6 @@ export default function IncidentForm({ onIncidentCreated }) {
       setBusy(false)
     }
   }
-  function locate() {
-    if (!navigator.geolocation) {
-      setError(
-        'Location is unavailable in this browser. Enter coordinates below.',
-      )
-      return
-    }
-    setLocating(true)
-    setError('')
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(String(position.coords.latitude))
-        setLongitude(String(position.coords.longitude))
-        setLocating(false)
-      },
-      () => {
-        setError('Location could not be read. Enter coordinates below.')
-        setLocating(false)
-      },
-      { timeout: 10_000, maximumAge: 0 },
-    )
-  }
   return (
     <section className="form-card">
       <span className="section-label">NEW INCIDENT</span>
@@ -80,6 +58,16 @@ export default function IncidentForm({ onIncidentCreated }) {
           />
         </label>
         <div className="location-fields">
+          <ReportLocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            disabled={busy}
+            onSelect={(nextLatitude, nextLongitude) => {
+              setLatitude(String(nextLatitude))
+              setLongitude(String(nextLongitude))
+              setError('')
+            }}
+          />
           <div className="coordinate-inputs">
             <label>
               Latitude
@@ -110,14 +98,6 @@ export default function IncidentForm({ onIncidentCreated }) {
               />
             </label>
           </div>
-          <button
-            type="button"
-            className="text-button"
-            onClick={locate}
-            disabled={busy || locating}
-          >
-            {locating ? 'Reading location…' : 'Use my current location'}
-          </button>{' '}
         </div>
         {error && (
           <p className="error" role="alert">
@@ -126,7 +106,7 @@ export default function IncidentForm({ onIncidentCreated }) {
         )}
         <button
           className="primary-button form-submit"
-          disabled={busy || locating}
+          disabled={busy}
         >
           {busy ? 'Saving report…' : 'Save report'}
         </button>

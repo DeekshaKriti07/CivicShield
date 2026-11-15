@@ -323,8 +323,8 @@ a.secondary-button {
   margin: 6px 0;
 }
 .form-card form.restore-incident-form {
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) auto;
-  align-items: end;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 1.4fr);
+  align-items: start;
   gap: 16px;
 }
 .restore-incident-form > label {
@@ -355,13 +355,16 @@ a.secondary-button {
   padding: 5px 0;
 }
 .restore-incident-form .form-submit {
-  height: 86px;
+  grid-column: 1/-1;
+  height: 44px;
+  justify-self: end;
 }
 .restore-incident-form > .error {
   grid-column: 1/-1;
   order: 4;
   margin: 0;
 }
+.report-location-picker{position:relative;display:grid;gap:8px}.report-location-tools{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px}.location-action,.report-location-search button{border:1px solid rgba(34,211,238,.35);border-radius:8px;background:rgba(34,211,238,.08);color:var(--cyan);padding:9px 11px;font-size:10px;font-weight:700;white-space:nowrap}.report-location-search{display:grid;grid-template-columns:minmax(0,1fr) auto}.report-location-search input{border-radius:8px 0 0 8px}.report-location-search button{border-radius:0 8px 8px 0}.report-location-map{height:260px;border:1px solid var(--border);border-radius:10px;overflow:hidden}.report-location-map .leaflet-container{width:100%;height:100%;background:var(--surface2);cursor:crosshair}.report-location-results{position:absolute;z-index:1001;top:43px;right:0;width:min(100%,520px);max-height:210px;overflow:auto;border:1px solid var(--border);border-radius:9px;background:var(--surface);box-shadow:var(--shadow);padding:5px}.report-location-results button{display:block;width:100%;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);padding:9px;text-align:left;font-size:10px}.report-location-results button:hover{background:var(--surface2)}.report-location-results button:last-child{border-bottom:0}.report-location-status{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:9px;line-height:1.4}.report-location-status strong{color:var(--cyan);font:600 9px 'IBM Plex Mono',monospace;white-space:nowrap}.location-fields{display:grid;gap:10px}
 .page-heading {
   display: flex;
   align-items: center;
