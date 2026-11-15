@@ -65,7 +65,12 @@ async def protect_requests(request: Request, call_next):
                 {"detail": "Request origin could not be verified."}, status_code=403
             )
         length = request.headers.get("content-length", "0")
-        if not length.isdigit() or int(length) > 16_384:
+        request_limit = (
+            5_500_000
+            if request.url.path == "/api/incident-with-evidence"
+            else 16_384
+        )
+        if not length.isdigit() or int(length) > request_limit:
             response = JSONResponse(
                 {"detail": "Request body is too large."}, status_code=413
             )

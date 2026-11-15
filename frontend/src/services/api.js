@@ -4,12 +4,13 @@ export async function request(path, options = {}) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 40_000)
   try {
+    const isFormData = options.body instanceof FormData
     const response = await fetch(`${API_BASE}${path}`, {
       ...options,
       signal: options.signal || controller.signal,
       credentials: 'same-origin',
       headers: {
-        'Content-Type': 'application/json',
+        ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
         'X-CSRF-Protection': '1',
         ...options.headers,
       },
@@ -73,9 +74,20 @@ export const api = {
   logout: () => post('/auth/logout'),
   incidents: (offset = 0) => request(`/incidents?limit=100&offset=${offset}`),
   incident: (id) => request(`/incident/${id}`),
+  evidence: (id) => request(`/incident/${id}/evidence`),
+  evidenceImageUrl: (incidentId, evidenceId) =>
+    `${API_BASE}/incident/${incidentId}/evidence/${evidenceId}/image`,
   timeline: (id) => request(`/incident/${id}/timeline`),
   analysis: (id) => request(`/incident/${id}/analysis`),
   createIncident: (payload) => post('/incident', payload),
+  createIncidentWithEvidence: (payload, evidence) => {
+    const form = new FormData()
+    form.append('description', payload.description)
+    form.append('latitude', String(payload.latitude))
+    form.append('longitude', String(payload.longitude))
+    form.append('evidence', evidence)
+    return request('/incident-with-evidence', { method: 'POST', body: form })
+  },
   workflow: (id) => post(`/incident/${id}/workflow`),
   approve: (id) => post(`/incident/${id}/approve`),
   assign: (id) => post(`/incident/${id}/assign`),

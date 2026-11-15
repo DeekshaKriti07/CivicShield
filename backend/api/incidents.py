@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,7 +10,14 @@ from sqlalchemy.orm import Session
 from backend.api.auth import get_current_user, require_operator
 from backend.auth_models import User
 from backend.database import get_db
-from backend.models import AgentEvent, Incident, IncidentAccess, IncidentAnalysis
+from backend.models import (
+    AgentEvent,
+    Evidence,
+    EvidenceAsset,
+    Incident,
+    IncidentAccess,
+    IncidentAnalysis,
+)
 from backend.schemas import IncidentCreate, IncidentResponse, ResolutionRequest
 from backend.security import rate_limit
 from backend.services.ai_classifier import AIClassifier
@@ -64,6 +71,15 @@ def transition(db, incident, expected, status):
         raise HTTPException(409, "This incident changed. Refresh before trying again.")
 
 
+def save_incident(db, user, payload):
+    incident = Incident(**payload.model_dump(), status="RECEIVED")
+    db.add(incident)
+    db.flush()
+    db.add(IncidentAccess(incident_id=incident.id, user_id=user.id))
+    log_event(db, incident.id, user.username, "INCIDENT_CREATED", "Report recorded.")
+    return incident
+
+
 @router.post("/incident", response_model=IncidentResponse, status_code=201)
 def create_incident(
     payload: IncidentCreate,
@@ -71,11 +87,66 @@ def create_incident(
     db: Session = Depends(get_db),
 ):
     rate_limit(db, f"create:{user.id}", 30, 3600)
-    incident = Incident(**payload.model_dump(), status="RECEIVED")
-    db.add(incident)
+    incident = save_incident(db, user, payload)
+    db.commit()
+    db.refresh(incident)
+    return incident
+
+
+@router.post("/incident-with-evidence", response_model=IncidentResponse, status_code=201)
+async def create_incident_with_evidence(
+    description: str = Form(min_length=3, max_length=5000),
+    latitude: float = Form(ge=-90, le=90),
+    longitude: float = Form(ge=-180, le=180),
+    evidence: UploadFile = File(),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit(db, f"create:{user.id}", 30, 3600)
+    allowed = {
+        "image/jpeg": (b"\xff\xd8\xff",),
+        "image/png": (b"\x89PNG\r\n\x1a\n",),
+        "image/webp": (b"RIFF",),
+    }
+    if evidence.content_type not in allowed:
+        raise HTTPException(415, "Evidence must be a JPG, PNG, or WEBP image.")
+    content = await evidence.read(5_000_001)
+    if not content or len(content) > 5_000_000:
+        raise HTTPException(413, "Evidence image must be 5 MB or smaller.")
+    if not any(content.startswith(signature) for signature in allowed[evidence.content_type]):
+        raise HTTPException(415, "The selected file is not a valid image.")
+    if evidence.content_type == "image/webp" and content[8:12] != b"WEBP":
+        raise HTTPException(415, "The selected file is not a valid WEBP image.")
+
+    payload = IncidentCreate(
+        description=description,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    incident = save_incident(db, user, payload)
+    evidence_record = Evidence(
+        incident_id=incident.id,
+        evidence_type="IMAGE",
+        file_path=None,
+    )
+    db.add(evidence_record)
     db.flush()
-    db.add(IncidentAccess(incident_id=incident.id, user_id=user.id))
-    log_event(db, incident.id, user.username, "INCIDENT_CREATED", "Report recorded.")
+    safe_name = (evidence.filename or "evidence-image")[-255:]
+    db.add(
+        EvidenceAsset(
+            evidence_id=evidence_record.id,
+            filename=safe_name,
+            content_type=evidence.content_type,
+            content=content,
+        )
+    )
+    log_event(
+        db,
+        incident.id,
+        user.username,
+        "EVIDENCE_ATTACHED",
+        "Image evidence attached to the report.",
+    )
     db.commit()
     db.refresh(incident)
     return incident
@@ -104,6 +175,54 @@ def get_incident(
     db: Session = Depends(get_db),
 ):
     return get_incident_or_404(incident_id, db, user)
+
+
+@router.get("/incident/{incident_id}/evidence")
+def incident_evidence(
+    incident_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    get_incident_or_404(incident_id, db, user)
+    rows = (
+        db.query(Evidence, EvidenceAsset)
+        .join(EvidenceAsset, EvidenceAsset.evidence_id == Evidence.id)
+        .filter(Evidence.incident_id == incident_id)
+        .order_by(Evidence.id)
+        .all()
+    )
+    return [
+        {
+            "id": evidence.id,
+            "filename": asset.filename,
+            "content_type": asset.content_type,
+            "created_at": evidence.created_at,
+        }
+        for evidence, asset in rows
+    ]
+
+
+@router.get("/incident/{incident_id}/evidence/{evidence_id}/image")
+def evidence_image(
+    incident_id: int,
+    evidence_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    get_incident_or_404(incident_id, db, user)
+    asset = (
+        db.query(EvidenceAsset)
+        .join(Evidence, Evidence.id == EvidenceAsset.evidence_id)
+        .filter(Evidence.id == evidence_id, Evidence.incident_id == incident_id)
+        .first()
+    )
+    if asset is None:
+        raise HTTPException(404, "Evidence not found.")
+    return Response(
+        content=asset.content,
+        media_type=asset.content_type,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
 
 
 @router.get("/incident/{incident_id}/timeline")

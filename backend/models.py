@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, Text
+from sqlalchemy import DateTime, Float, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.database import Base
@@ -304,6 +304,17 @@ class Evidence(Base):
         DateTime,
         default=utc_now,
     )
+
+
+class EvidenceAsset(Base):
+    """Database-backed evidence content; survives stateless web-service restarts."""
+
+    __tablename__ = "evidence_assets"
+
+    evidence_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
 class IncidentAccess(Base):

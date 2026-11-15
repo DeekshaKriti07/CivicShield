@@ -69,7 +69,12 @@ class RequestBodyLimit:
             if message["type"] == "http.disconnect":
                 return
             size += len(message.get("body", b""))
-            if size > self.max_bytes:
+            request_limit = (
+                5_500_000
+                if scope["path"] == "/api/incident-with-evidence"
+                else self.max_bytes
+            )
+            if size > request_limit:
                 from starlette.responses import JSONResponse
 
                 await JSONResponse(

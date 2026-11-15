@@ -6,6 +6,7 @@ const LiveMap = lazy(() => import('./LiveMap'))
 export default function IncidentDetail({ incidentId, user }) {
   const [record, setRecord] = useState(null)
   const [analysis, setAnalysis] = useState(null)
+  const [evidence, setEvidence] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -13,20 +14,23 @@ export default function IncidentDetail({ incidentId, user }) {
   const [showMap, setShowMap] = useState(false)
   const operator = ['OPERATOR', 'ADMIN'].includes(user.role)
   async function load() {
-    const [incident, result] = await Promise.all([
+    const [incident, result, attachedEvidence] = await Promise.all([
       api.incident(incidentId),
       api.analysis(incidentId),
+      api.evidence(incidentId),
     ])
     setRecord(incident)
     setAnalysis(result)
+    setEvidence(attachedEvidence)
   }
   useEffect(() => {
     let active = true
-    Promise.all([api.incident(incidentId), api.analysis(incidentId)])
-      .then(([i, a]) => {
+    Promise.all([api.incident(incidentId), api.analysis(incidentId), api.evidence(incidentId)])
+      .then(([i, a, attachedEvidence]) => {
         if (active) {
           setRecord(i)
           setAnalysis(a)
+          setEvidence(attachedEvidence)
         }
       })
       .catch((err) => {
@@ -109,6 +113,20 @@ export default function IncidentDetail({ incidentId, user }) {
               <Suspense fallback={<p>Loading map…</p>}>
                 <LiveMap incident={record} />
               </Suspense>
+            )}
+            {evidence.length > 0 && (
+              <div className="incident-evidence">
+                <h3>Photo evidence</h3>
+                {evidence.map((item) => (
+                  <figure key={item.id}>
+                    <img
+                      src={api.evidenceImageUrl(record.id, item.id)}
+                      alt={`Evidence attached to report ${record.id}`}
+                    />
+                    <figcaption>{item.filename}</figcaption>
+                  </figure>
+                ))}
+              </div>
             )}
           </section>
           <section className="panel padded">
